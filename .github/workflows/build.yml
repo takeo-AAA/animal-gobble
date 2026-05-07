@@ -25,6 +25,9 @@ jobs:
         with:
           gradle-version: '8.6'
 
+      - name: Create local.properties
+        run: echo "sdk.dir=$ANDROID_HOME" > local.properties
+
       - name: Build debug APK
         run: gradle assembleDebug --no-daemon
 
