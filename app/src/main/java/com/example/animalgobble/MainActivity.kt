@@ -29,6 +29,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 // ---------------------------------------------------------------------------
 // Domain model
@@ -36,9 +39,7 @@ import androidx.compose.ui.window.Dialog
 
 enum class AppScreen { TITLE, HOW_TO_PLAY, GAME }
 
-enum class PieceSize(val order: Int) {
-    SMALL(1), MEDIUM(2), LARGE(3)
-}
+enum class PieceSize(val order: Int) { SMALL(1), MEDIUM(2), LARGE(3) }
 
 enum class Player(
     val label: String,
@@ -71,25 +72,28 @@ data class GameState(
     val selectedBoardPos: Pair<Int, Int>? = null
 )
 
+// Represents a single move for the CPU AI
+data class Move(
+    val fromBoardPos: Pair<Int, Int>? = null,
+    val fromHandSize: PieceSize? = null,
+    val toRow: Int,
+    val toCol: Int
+)
+
 // ---------------------------------------------------------------------------
 // Game logic
 // ---------------------------------------------------------------------------
 
 fun checkWinner(board: List<List<List<Piece>>>): Player? {
     val lines = listOf(
-        listOf(Pair(0,0), Pair(0,1), Pair(0,2)),
-        listOf(Pair(1,0), Pair(1,1), Pair(1,2)),
-        listOf(Pair(2,0), Pair(2,1), Pair(2,2)),
-        listOf(Pair(0,0), Pair(1,0), Pair(2,0)),
-        listOf(Pair(0,1), Pair(1,1), Pair(2,1)),
-        listOf(Pair(0,2), Pair(1,2), Pair(2,2)),
-        listOf(Pair(0,0), Pair(1,1), Pair(2,2)),
-        listOf(Pair(0,2), Pair(1,1), Pair(2,0))
+        listOf(0 to 0, 0 to 1, 0 to 2), listOf(1 to 0, 1 to 1, 1 to 2), listOf(2 to 0, 2 to 1, 2 to 2),
+        listOf(0 to 0, 1 to 0, 2 to 0), listOf(0 to 1, 1 to 1, 2 to 1), listOf(0 to 2, 1 to 2, 2 to 2),
+        listOf(0 to 0, 1 to 1, 2 to 2), listOf(0 to 2, 1 to 1, 2 to 0)
     )
     for (line in lines) {
         val tops = line.map { (r, c) -> board[r][c].lastOrNull() }
-        if (tops.all { it != null && it.player == Player.ONE }) return Player.ONE
-        if (tops.all { it != null && it.player == Player.TWO }) return Player.TWO
+        if (tops.all { it?.player == Player.ONE }) return Player.ONE
+        if (tops.all { it?.player == Player.TWO }) return Player.TWO
     }
     return null
 }
@@ -99,12 +103,9 @@ fun placePiece(state: GameState, toRow: Int, toCol: Int): GameState {
     val fromHandSize = state.selectedHandPiece
 
     val pieceToPlace: Piece = when {
-        fromBoard != null -> {
-            state.board[fromBoard.first][fromBoard.second].lastOrNull() ?: return state
-        }
+        fromBoard != null -> state.board[fromBoard.first][fromBoard.second].lastOrNull() ?: return state
         fromHandSize != null -> {
-            val count = state.hand[state.currentPlayer]?.get(fromHandSize) ?: 0
-            if (count <= 0) return state
+            if ((state.hand[state.currentPlayer]?.get(fromHandSize) ?: 0) <= 0) return state
             Piece(state.currentPlayer, fromHandSize)
         }
         else -> return state
@@ -112,22 +113,17 @@ fun placePiece(state: GameState, toRow: Int, toCol: Int): GameState {
 
     val topOfTarget = state.board[toRow][toCol].lastOrNull()
     if (topOfTarget != null && topOfTarget.size.order >= pieceToPlace.size.order) return state
-    if (fromBoard != null && fromBoard.first == toRow && fromBoard.second == toCol) return state
+    if (fromBoard != null && fromBoard == toRow to toCol) return state
 
+    // Reveal rule
     if (fromBoard != null) {
         val boardAfterLift = state.board.mapIndexed { r, row ->
             row.mapIndexed { c, stack ->
                 if (r == fromBoard.first && c == fromBoard.second) stack.dropLast(1) else stack
             }
         }
-        val revealedWinner = checkWinner(boardAfterLift)
-        if (revealedWinner != null) {
-            return state.copy(
-                board = boardAfterLift,
-                winner = revealedWinner,
-                selectedHandPiece = null,
-                selectedBoardPos = null
-            )
+        checkWinner(boardAfterLift)?.let { revealed ->
+            return state.copy(board = boardAfterLift, winner = revealed, selectedHandPiece = null, selectedBoardPos = null)
         }
     }
 
@@ -140,26 +136,104 @@ fun placePiece(state: GameState, toRow: Int, toCol: Int): GameState {
             }
         }
     }
-
     val newHand = if (fromHandSize != null) {
         state.hand.toMutableMap().also { h ->
-            val playerHand = h[state.currentPlayer]!!.toMutableMap()
-            playerHand[fromHandSize] = (playerHand[fromHandSize] ?: 0) - 1
-            h[state.currentPlayer] = playerHand
+            val ph = h[state.currentPlayer]!!.toMutableMap()
+            ph[fromHandSize] = (ph[fromHandSize] ?: 0) - 1
+            h[state.currentPlayer] = ph
         }
     } else state.hand
 
     val winner = checkWinner(newBoard)
-    val nextPlayer = if (state.currentPlayer == Player.ONE) Player.TWO else Player.ONE
-
+    val next = if (state.currentPlayer == Player.ONE) Player.TWO else Player.ONE
     return state.copy(
-        board = newBoard,
-        hand = newHand,
-        currentPlayer = if (winner != null) state.currentPlayer else nextPlayer,
-        winner = winner,
-        selectedHandPiece = null,
-        selectedBoardPos = null
+        board = newBoard, hand = newHand,
+        currentPlayer = if (winner != null) state.currentPlayer else next,
+        winner = winner, selectedHandPiece = null, selectedBoardPos = null
     )
+}
+
+// ---------------------------------------------------------------------------
+// CPU AI  (minimax with alpha-beta pruning, depth 4)
+// ---------------------------------------------------------------------------
+
+private val WIN_LINES = listOf(
+    listOf(0 to 0, 0 to 1, 0 to 2), listOf(1 to 0, 1 to 1, 1 to 2), listOf(2 to 0, 2 to 1, 2 to 2),
+    listOf(0 to 0, 1 to 0, 2 to 0), listOf(0 to 1, 1 to 1, 2 to 1), listOf(0 to 2, 1 to 2, 2 to 2),
+    listOf(0 to 0, 1 to 1, 2 to 2), listOf(0 to 2, 1 to 1, 2 to 0)
+)
+
+fun generateMoves(state: GameState, player: Player): List<Move> {
+    val moves = mutableListOf<Move>()
+    // From hand
+    for (size in PieceSize.entries) {
+        if ((state.hand[player]?.get(size) ?: 0) <= 0) continue
+        for (r in 0..2) for (c in 0..2) {
+            val top = state.board[r][c].lastOrNull()
+            if (top == null || top.size.order < size.order)
+                moves.add(Move(fromHandSize = size, toRow = r, toCol = c))
+        }
+    }
+    // From board
+    for (fr in 0..2) for (fc in 0..2) {
+        val piece = state.board[fr][fc].lastOrNull() ?: continue
+        if (piece.player != player) continue
+        for (tr in 0..2) for (tc in 0..2) {
+            if (fr == tr && fc == tc) continue
+            val top = state.board[tr][tc].lastOrNull()
+            if (top == null || top.size.order < piece.size.order)
+                moves.add(Move(fromBoardPos = fr to fc, toRow = tr, toCol = tc))
+        }
+    }
+    return moves
+}
+
+fun applyMove(state: GameState, move: Move): GameState =
+    placePiece(
+        state.copy(selectedHandPiece = move.fromHandSize, selectedBoardPos = move.fromBoardPos),
+        move.toRow, move.toCol
+    )
+
+fun evaluateBoard(board: List<List<List<Piece>>>, cpu: Player): Int {
+    val human = if (cpu == Player.ONE) Player.TWO else Player.ONE
+    var score = 0
+    for (line in WIN_LINES) {
+        val tops = line.map { (r, c) -> board[r][c].lastOrNull() }
+        val cc = tops.count { it?.player == cpu }
+        val hc = tops.count { it?.player == human }
+        if (hc == 0) score += if (cc == 2) 4 else if (cc == 1) 1 else 0
+        if (cc == 0) score -= if (hc == 2) 4 else if (hc == 1) 1 else 0
+    }
+    return score
+}
+
+fun minimax(state: GameState, depth: Int, alpha: Int, beta: Int, cpu: Player): Int {
+    state.winner?.let { w -> return if (w == cpu) 1000 + depth else -1000 - depth }
+    if (depth == 0) return evaluateBoard(state.board, cpu)
+    val moves = generateMoves(state, state.currentPlayer)
+    if (moves.isEmpty()) return 0
+    return if (state.currentPlayer == cpu) {
+        var best = -9999; var a = alpha
+        for (m in moves) {
+            best = maxOf(best, minimax(applyMove(state, m), depth - 1, a, beta, cpu))
+            a = maxOf(a, best); if (beta <= a) break
+        }
+        best
+    } else {
+        var best = 9999; var b = beta
+        for (m in moves) {
+            best = minOf(best, minimax(applyMove(state, m), depth - 1, alpha, b, cpu))
+            b = minOf(b, best); if (b <= alpha) break
+        }
+        best
+    }
+}
+
+fun getBestMove(state: GameState, cpu: Player): Move? {
+    val moves = generateMoves(state, cpu)
+    return moves.maxByOrNull { m ->
+        minimax(applyMove(state, m), depth = 3, -9999, 9999, cpu)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -172,10 +246,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MaterialTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = Color(0xFFF5F0E8)
-                ) {
+                Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFFF5F0E8)) {
                     AppHost()
                 }
             }
@@ -186,17 +257,15 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AppHost() {
     var screen by remember { mutableStateOf(AppScreen.TITLE) }
+    var isCpuMode by remember { mutableStateOf(false) }
     when (screen) {
         AppScreen.TITLE -> TitleScreen(
-            onStart = { screen = AppScreen.GAME },
+            onStart2P = { isCpuMode = false; screen = AppScreen.GAME },
+            onStartCpu = { isCpuMode = true; screen = AppScreen.GAME },
             onHowToPlay = { screen = AppScreen.HOW_TO_PLAY }
         )
-        AppScreen.HOW_TO_PLAY -> HowToPlayScreen(
-            onBack = { screen = AppScreen.TITLE }
-        )
-        AppScreen.GAME -> GameScreen(
-            onBackToTitle = { screen = AppScreen.TITLE }
-        )
+        AppScreen.HOW_TO_PLAY -> HowToPlayScreen(onBack = { screen = AppScreen.TITLE })
+        AppScreen.GAME -> GameScreen(isCpuMode = isCpuMode, onBackToTitle = { screen = AppScreen.TITLE })
     }
 }
 
@@ -205,53 +274,36 @@ fun AppHost() {
 // ---------------------------------------------------------------------------
 
 @Composable
-fun TitleScreen(onStart: () -> Unit, onHowToPlay: () -> Unit) {
+fun TitleScreen(onStart2P: () -> Unit, onStartCpu: () -> Unit, onHowToPlay: () -> Unit) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .systemBarsPadding()
-            .padding(24.dp),
+        modifier = Modifier.fillMaxSize().systemBarsPadding().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceEvenly
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("🐾", fontSize = 56.sp)
             Text(
-                text = "🐾",
-                fontSize = 56.sp
-            )
-            Text(
-                text = "Animal Gobble",
-                fontSize = 34.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = Color(0xFF4E342E),
-                textAlign = TextAlign.Center
+                "Animal Gobble",
+                fontSize = 34.sp, fontWeight = FontWeight.ExtraBold,
+                color = Color(0xFF4E342E), textAlign = TextAlign.Center
             )
             Spacer(Modifier.height(6.dp))
-            Text(
-                text = "アニマルゴブル",
-                fontSize = 15.sp,
-                color = Color(0xFF8D6E63)
-            )
+            Text("アニマルゴブル", fontSize = 15.sp, color = Color(0xFF8D6E63))
         }
 
-        // Animals
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("🦁", fontSize = 52.sp)
-                Text("🐈", fontSize = 36.sp)
-                Text("🐱", fontSize = 24.sp)
+                Text("🦁", fontSize = 52.sp); Text("🐈", fontSize = 36.sp); Text("🐱", fontSize = 24.sp)
                 Spacer(Modifier.height(4.dp))
                 Text("🐱 ネコチーム", color = Color(0xFFFF8F00), fontWeight = FontWeight.Bold)
             }
             Text("VS", fontSize = 22.sp, fontWeight = FontWeight.Black, color = Color(0xFF8D6E63))
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("🐺", fontSize = 52.sp)
-                Text("🐕", fontSize = 36.sp)
-                Text("🐶", fontSize = 24.sp)
+                Text("🐺", fontSize = 52.sp); Text("🐕", fontSize = 36.sp); Text("🐶", fontSize = 24.sp)
                 Spacer(Modifier.height(4.dp))
                 Text("🐶 イヌチーム", color = Color(0xFF1565C0), fontWeight = FontWeight.Bold)
             }
@@ -259,38 +311,30 @@ fun TitleScreen(onStart: () -> Unit, onHowToPlay: () -> Unit) {
 
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Button(
-                onClick = onStart,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
+                onClick = onStart2P,
+                modifier = Modifier.fillMaxWidth().height(52.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF8F00))
-            ) {
-                Text("ゲームスタート", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            }
+            ) { Text("👥 2人対戦", fontSize = 17.sp, fontWeight = FontWeight.Bold) }
+            Button(
+                onClick = onStartCpu,
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1565C0))
+            ) { Text("🤖 CPU対戦", fontSize = 17.sp, fontWeight = FontWeight.Bold) }
             OutlinedButton(
                 onClick = onHowToPlay,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
+                modifier = Modifier.fillMaxWidth().height(46.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF4E342E)),
-                border = ButtonDefaults.outlinedButtonBorder.copy(
-                    width = 1.5.dp
-                )
-            ) {
-                Text("遺び方", fontSize = 16.sp)
-            }
+                border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.5.dp)
+            ) { Text("遺び方", fontSize = 15.sp) }
         }
 
-        Text(
-            text = "２人対戦・同一端末プレイ",
-            fontSize = 12.sp,
-            color = Color(0xFF8D6E63)
-        )
+        Text("同一端末・2人対面プレイ対応", fontSize = 12.sp, color = Color(0xFF8D6E63))
     }
 }
 
@@ -301,92 +345,41 @@ fun TitleScreen(onStart: () -> Unit, onHowToPlay: () -> Unit) {
 @Composable
 fun HowToPlayScreen(onBack: () -> Unit) {
     val scrollState = rememberScrollState()
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .systemBarsPadding()
-    ) {
-        // Top bar
+    Column(modifier = Modifier.fillMaxSize().systemBarsPadding()) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "戻る",
-                    tint = Color(0xFF4E342E)
-                )
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る", tint = Color(0xFF4E342E))
             }
-            Text(
-                text = "遺び方",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF4E342E)
-            )
+            Text("遺び方", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4E342E))
         }
-
         HorizontalDivider(color = Color(0xFFD7CCC8))
-
         Column(
-            modifier = Modifier
-                .verticalScroll(scrollState)
-                .padding(20.dp),
+            modifier = Modifier.verticalScroll(scrollState).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            RuleSection(
-                emoji = "🎯",
-                title = "ゲームの目的",
-                body = "ネコチームとイヌチームの、2人対戦ボードゲームです。\n3×3のマスに自分の馨を広げて、縦・横・斜めのいずれか】3つ並べた方が勝ちです。"
-            )
-
-            RuleSection(
-                emoji = "🐱",
-                title = "馨について",
-                body = "各チームにS（小）・M（中）＋L（大）の3サイズの馨がそれぞれ2個ずつ、合計6個あります。\n\n🐱 S ：小さなネコ（小）\n🐈 M ：中くらいのネコ（中）\n🦁 L ：大きなライオン（大）"
-            )
-
-            RuleSection(
-                emoji = "💪",
-                title = "馨の大小関係",
-                body = "大きい馨は小さい馨の上に被せて隠すことができます。\n\nL > M > Sの順で大きいほど強いです。\n同じ大きさや小さい馨が被せることはできません。"
-            )
-
-            RuleSection(
-                emoji = "🔄",
-                title = "手番でできること",
-                body = "一回の手番で、次のどちらか1つを選んで行動します。\n\n▶ 手持ちの馨を盤面に置く\n▶ 盤面上の自分の馨を持ち上げて別のマスへ移動する"
-            )
-
-            RuleSection(
-                emoji = "⚠️",
-                title = "リベールルール（重要）",
-                body = "盤面上の馨を持ち上げた瞬間、隠れていた相手の馨が現れて相手の3並びが成立した場合→ その場で相手の勝ちです。\n\n持ち上げた馨でブロックしようとしても無効です。馨を動かす前によく考えましょう！",
-                highlight = true
-            )
-
-            RuleSection(
-                emoji = "📱",
-                title = "対面プレイ",
-                body = "同じスマホを1台でテーブルを挑んで対戦できます。\n画面上部のエリアは相手側（180°回転）、下部は自分側です。"
-            )
-
+            RuleSection("🎯", "ゲームの目的",
+                "ネコチームとイヌチームの２人対戦ボードゲーム。\n3×3のマスに自分の馨を広げて、縦・横・斜めに3つ並べた方が勝ちです。")
+            RuleSection("🐱", "馨について",
+                "各チームにS（小）・M（中）・L（大）の馨がそれぞれ2個ずつ、合計6個あります。\n\n🐱 S ：小さなネコ\n🐈 M ：中くらいのネコ\n🦁 L ：大きなライオン")
+            RuleSection("💪", "馨の大小関係",
+                "大きい馨は小さい馨の上に被せて隠せます。\nL > M > S の順。同じ大きさや小さい馨を被せることはできません。")
+            RuleSection("🔄", "手番でできること",
+                "一回の手番で次のどちらか1つを行います。\n\n▶ 手持ちの馨を盤面に置く\n▶ 盤面上の自分の馨を持ち上げて別のマスへ移動")
+            RuleSection("⚠️", "リベールルール（重要）",
+                "盤面上の馨を持ち上げた瞬間、隠れていた相手の馨が現れて相手の3並びが成立→ その場で相手の勝ち。\n持ち上げた馨でブロックしようとしても無効です。馨を動かす前によく考えましょう！",
+                highlight = true)
+            RuleSection("📱", "対面プレイ",
+                "同じスマホ1台でテーブルを挑んで対戦できます。\n画面上部（相手側）は180°回転表示。")
             Spacer(Modifier.height(8.dp))
-
             Button(
                 onClick = onBack,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
+                modifier = Modifier.fillMaxWidth().height(52.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF8F00))
-            ) {
-                Text("タイトルに戻る", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-            }
-
+            ) { Text("タイトルに戻る", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
             Spacer(Modifier.height(8.dp))
         }
     }
@@ -394,43 +387,24 @@ fun HowToPlayScreen(onBack: () -> Unit) {
 
 @Composable
 fun RuleSection(emoji: String, title: String, body: String, highlight: Boolean = false) {
-    val bgColor = if (highlight) Color(0xFFFFF8E1) else Color.White
-    val borderColor = if (highlight) Color(0xFFFFB300) else Color(0xFFEEEEEE)
-
     Card(
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = bgColor),
-        border = CardDefaults.outlinedCardBorder().copy(
-            width = if (highlight) 1.5.dp else 1.dp
-        ),
+        colors = CardDefaults.cardColors(containerColor = if (highlight) Color(0xFFFFF8E1) else Color.White),
+        border = CardDefaults.outlinedCardBorder().copy(width = if (highlight) 1.5.dp else 1.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
+        Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
+                modifier = Modifier.size(40.dp).clip(CircleShape)
                     .background(if (highlight) Color(0xFFFFECB3) else Color(0xFFF5F0E8)),
                 contentAlignment = Alignment.Center
-            ) {
-                Text(emoji, fontSize = 20.sp)
-            }
+            ) { Text(emoji, fontSize = 20.sp) }
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    text = title,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
+                    title, fontSize = 15.sp, fontWeight = FontWeight.Bold,
                     color = if (highlight) Color(0xFFE65100) else Color(0xFF4E342E)
                 )
-                Text(
-                    text = body,
-                    fontSize = 13.sp,
-                    color = Color(0xFF5D4037),
-                    lineHeight = 20.sp
-                )
+                Text(body, fontSize = 13.sp, color = Color(0xFF5D4037), lineHeight = 20.sp)
             }
         }
     }
@@ -441,36 +415,51 @@ fun RuleSection(emoji: String, title: String, body: String, highlight: Boolean =
 // ---------------------------------------------------------------------------
 
 @Composable
-fun GameScreen(onBackToTitle: () -> Unit = {}) {
+fun GameScreen(onBackToTitle: () -> Unit = {}, isCpuMode: Boolean = false) {
+    val cpuPlayer = if (isCpuMode) Player.TWO else null
     var gameState by remember { mutableStateOf(GameState()) }
+    var cpuThinking by remember { mutableStateOf(false) }
+
+    LaunchedEffect(gameState.currentPlayer, gameState.winner) {
+        if (cpuPlayer != null && gameState.winner == null && gameState.currentPlayer == cpuPlayer) {
+            cpuThinking = true
+            delay(500)
+            val move = withContext(Dispatchers.Default) { getBestMove(gameState, cpuPlayer) }
+            move?.let { gameState = applyMove(gameState, it) }
+            cpuThinking = false
+        }
+    }
 
     if (gameState.winner != null) {
         WinnerDialog(
             winner = gameState.winner!!,
+            isCpuMode = isCpuMode,
             onReset = { gameState = GameState() },
             onBackToTitle = onBackToTitle
         )
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .systemBarsPadding()
-            .padding(8.dp),
+        modifier = Modifier.fillMaxSize().systemBarsPadding().padding(8.dp),
         verticalArrangement = Arrangement.SpaceBetween,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Player TWO area (top, rotated 180°)
+        // Player TWO area (top)
+        // CPU mode: no rotation needed (no second human); 2P mode: 180° for face-to-face
         Column(
-            modifier = Modifier.rotate(180f),
+            modifier = if (isCpuMode) Modifier else Modifier.rotate(180f),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            if (cpuThinking) {
+                Text("🤖 考え中…", color = Player.TWO.color, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            }
             PlayerArea(
                 player = Player.TWO,
                 gameState = gameState,
                 isCurrentPlayer = gameState.currentPlayer == Player.TWO,
+                interactionEnabled = !isCpuMode,
                 onHandPieceSelected = { size ->
-                    if (gameState.currentPlayer == Player.TWO) {
+                    if (!isCpuMode && gameState.currentPlayer == Player.TWO) {
                         gameState = gameState.copy(
                             selectedHandPiece = if (gameState.selectedHandPiece == size) null else size,
                             selectedBoardPos = null
@@ -480,35 +469,31 @@ fun GameScreen(onBackToTitle: () -> Unit = {}) {
             )
         }
 
-        // Board
         BoardGrid(
             gameState = gameState,
             onCellClick = { row, col ->
-                if (gameState.winner != null) return@BoardGrid
+                if (gameState.winner != null || cpuThinking) return@BoardGrid
+                if (isCpuMode && gameState.currentPlayer == cpuPlayer) return@BoardGrid
                 val topPiece = gameState.board[row][col].lastOrNull()
                 when {
                     topPiece != null && topPiece.player == gameState.currentPlayer
-                        && gameState.selectedHandPiece == null
-                        && gameState.selectedBoardPos == null -> {
-                        gameState = gameState.copy(selectedBoardPos = Pair(row, col))
-                    }
-                    gameState.selectedBoardPos == Pair(row, col) -> {
+                        && gameState.selectedHandPiece == null && gameState.selectedBoardPos == null ->
+                        gameState = gameState.copy(selectedBoardPos = row to col)
+                    gameState.selectedBoardPos == row to col ->
                         gameState = gameState.copy(selectedBoardPos = null)
-                    }
-                    gameState.selectedHandPiece != null || gameState.selectedBoardPos != null -> {
+                    gameState.selectedHandPiece != null || gameState.selectedBoardPos != null ->
                         gameState = placePiece(gameState, row, col)
-                    }
                 }
             }
         )
 
-        // Player ONE area (bottom)
         PlayerArea(
             player = Player.ONE,
             gameState = gameState,
             isCurrentPlayer = gameState.currentPlayer == Player.ONE,
+            interactionEnabled = !cpuThinking,
             onHandPieceSelected = { size ->
-                if (gameState.currentPlayer == Player.ONE) {
+                if (gameState.currentPlayer == Player.ONE && !cpuThinking) {
                     gameState = gameState.copy(
                         selectedHandPiece = if (gameState.selectedHandPiece == size) null else size,
                         selectedBoardPos = null
@@ -524,47 +509,32 @@ fun PlayerArea(
     player: Player,
     gameState: GameState,
     isCurrentPlayer: Boolean,
+    interactionEnabled: Boolean = true,
     onHandPieceSelected: (PieceSize) -> Unit
 ) {
     val bgColor by animateColorAsState(
         targetValue = if (isCurrentPlayer) player.color.copy(alpha = 0.15f) else Color.Transparent,
-        animationSpec = tween(300),
-        label = "playerBg"
+        animationSpec = tween(300), label = "playerBg"
     )
-
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(bgColor)
-            .padding(8.dp),
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(bgColor).padding(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         Text(
             text = if (isCurrentPlayer) "あなたのターンです" else "",
-            color = player.color,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold
+            color = player.color, fontSize = 13.sp, fontWeight = FontWeight.Bold
         )
-        Text(
-            text = player.label,
-            color = player.color,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Text(player.label, color = player.color, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             PieceSize.entries.forEach { size ->
-                val count = gameState.hand[player]?.get(size) ?: 0
                 HandPieceButton(
-                    player = player,
-                    size = size,
-                    count = count,
+                    player = player, size = size,
+                    count = gameState.hand[player]?.get(size) ?: 0,
                     isSelected = isCurrentPlayer && gameState.selectedHandPiece == size,
-                    enabled = isCurrentPlayer && count > 0 && gameState.winner == null,
+                    enabled = interactionEnabled && isCurrentPlayer
+                        && (gameState.hand[player]?.get(size) ?: 0) > 0
+                        && gameState.winner == null,
                     onClick = { onHandPieceSelected(size) }
                 )
             }
@@ -574,20 +544,14 @@ fun PlayerArea(
 
 @Composable
 fun HandPieceButton(
-    player: Player,
-    size: PieceSize,
-    count: Int,
-    isSelected: Boolean,
-    enabled: Boolean,
-    onClick: () -> Unit
+    player: Player, size: PieceSize, count: Int,
+    isSelected: Boolean, enabled: Boolean, onClick: () -> Unit
 ) {
     val emojiSize = when (size) { PieceSize.SMALL -> 22.sp; PieceSize.MEDIUM -> 30.sp; PieceSize.LARGE -> 38.sp }
     val boxSize = when (size) { PieceSize.SMALL -> 52.dp; PieceSize.MEDIUM -> 62.dp; PieceSize.LARGE -> 72.dp }
-
     Box(
         modifier = Modifier
-            .size(boxSize)
-            .clip(RoundedCornerShape(10.dp))
+            .size(boxSize).clip(RoundedCornerShape(10.dp))
             .background(if (isSelected) player.color.copy(alpha = 0.3f) else Color.White.copy(alpha = if (enabled) 1f else 0.4f))
             .border(
                 width = if (isSelected) 2.dp else 1.dp,
@@ -598,28 +562,21 @@ fun HandPieceButton(
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(text = player.emoji[size] ?: "", fontSize = emojiSize)
-            Text(
-                text = "×$count",
-                fontSize = 11.sp,
-                color = if (enabled) Color.DarkGray else Color.LightGray
-            )
+            Text(player.emoji[size] ?: "", fontSize = emojiSize)
+            Text("×$count", fontSize = 11.sp, color = if (enabled) Color.DarkGray else Color.LightGray)
         }
     }
 }
 
 @Composable
 fun BoardGrid(gameState: GameState, onCellClick: (Int, Int) -> Unit) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         for (row in 0..2) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 for (col in 0..2) {
                     BoardCell(
                         stack = gameState.board[row][col],
-                        isSelected = gameState.selectedBoardPos == Pair(row, col),
+                        isSelected = gameState.selectedBoardPos == row to col,
                         onClick = { onCellClick(row, col) }
                     )
                 }
@@ -631,44 +588,38 @@ fun BoardGrid(gameState: GameState, onCellClick: (Int, Int) -> Unit) {
 @Composable
 fun BoardCell(stack: List<Piece>, isSelected: Boolean, onClick: () -> Unit) {
     val topPiece = stack.lastOrNull()
-    val borderColor = when {
-        isSelected -> Color(0xFFFFC107)
-        topPiece != null -> topPiece.player.color.copy(alpha = 0.6f)
-        else -> Color.Gray.copy(alpha = 0.3f)
-    }
-
     Box(
         modifier = Modifier
-            .size(100.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color.White)
+            .size(100.dp).clip(RoundedCornerShape(12.dp)).background(Color.White)
             .border(
                 width = if (isSelected) 3.dp else 1.5.dp,
-                color = borderColor,
+                color = when {
+                    isSelected -> Color(0xFFFFC107)
+                    topPiece != null -> topPiece.player.color.copy(alpha = 0.6f)
+                    else -> Color.Gray.copy(alpha = 0.3f)
+                },
                 shape = RoundedCornerShape(12.dp)
             )
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         if (topPiece != null) {
-            val emojiSize = when (topPiece.size) {
-                PieceSize.SMALL -> 28.sp; PieceSize.MEDIUM -> 38.sp; PieceSize.LARGE -> 52.sp
-            }
-            Text(text = topPiece.player.emoji[topPiece.size] ?: "", fontSize = emojiSize, textAlign = TextAlign.Center)
+            Text(
+                text = topPiece.player.emoji[topPiece.size] ?: "",
+                fontSize = when (topPiece.size) { PieceSize.SMALL -> 28.sp; PieceSize.MEDIUM -> 38.sp; PieceSize.LARGE -> 52.sp },
+                textAlign = TextAlign.Center
+            )
         }
         if (stack.size > 1) {
-            Text(
-                text = "${stack.size}",
-                fontSize = 10.sp,
-                color = Color.Gray,
-                modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp)
-            )
+            Text("${stack.size}", fontSize = 10.sp, color = Color.Gray,
+                modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp))
         }
     }
 }
 
 @Composable
-fun WinnerDialog(winner: Player, onReset: () -> Unit, onBackToTitle: () -> Unit) {
+fun WinnerDialog(winner: Player, isCpuMode: Boolean, onReset: () -> Unit, onBackToTitle: () -> Unit) {
+    val isCpuWon = isCpuMode && winner == Player.TWO
     Dialog(onDismissRequest = {}) {
         Card(
             shape = RoundedCornerShape(20.dp),
@@ -680,29 +631,22 @@ fun WinnerDialog(winner: Player, onReset: () -> Unit, onBackToTitle: () -> Unit)
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text("🏆 ゲーム終了！", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Text(if (isCpuWon) "🤖 CPUの勝ち！" else "🏆 ゲーム終了！",
+                    fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 Text(
-                    text = "${winner.label}\nの勝ち！",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = winner.color,
-                    textAlign = TextAlign.Center
+                    text = if (isCpuWon) "また挑戦してみよう！" else "${winner.label}\nの勝ち！",
+                    fontSize = 20.sp, fontWeight = FontWeight.Bold,
+                    color = winner.color, textAlign = TextAlign.Center
                 )
                 Button(
                     onClick = onReset,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = winner.color)
-                ) {
-                    Text("もう一度プレイ", fontSize = 16.sp)
-                }
+                ) { Text("もう一度プレイ", fontSize = 16.sp) }
                 OutlinedButton(
                     onClick = onBackToTitle,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("タイトルに戻る", fontSize = 14.sp)
-                }
+                    modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)
+                ) { Text("タイトルに戻る", fontSize = 14.sp) }
             }
         }
     }
@@ -711,7 +655,7 @@ fun WinnerDialog(winner: Player, onReset: () -> Unit, onBackToTitle: () -> Unit)
 @Preview(showBackground = true)
 @Composable
 fun TitleScreenPreview() {
-    MaterialTheme { TitleScreen(onStart = {}, onHowToPlay = {}) }
+    MaterialTheme { TitleScreen(onStart2P = {}, onStartCpu = {}, onHowToPlay = {}) }
 }
 
 @Preview(showBackground = true)
