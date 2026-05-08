@@ -72,7 +72,6 @@ data class GameState(
     val selectedBoardPos: Pair<Int, Int>? = null
 )
 
-// Represents a single move for the CPU AI
 data class Move(
     val fromBoardPos: Pair<Int, Int>? = null,
     val fromHandSize: PieceSize? = null,
@@ -115,7 +114,6 @@ fun placePiece(state: GameState, toRow: Int, toCol: Int): GameState {
     if (topOfTarget != null && topOfTarget.size.order >= pieceToPlace.size.order) return state
     if (fromBoard != null && fromBoard == toRow to toCol) return state
 
-    // Reveal rule
     if (fromBoard != null) {
         val boardAfterLift = state.board.mapIndexed { r, row ->
             row.mapIndexed { c, stack ->
@@ -154,7 +152,7 @@ fun placePiece(state: GameState, toRow: Int, toCol: Int): GameState {
 }
 
 // ---------------------------------------------------------------------------
-// CPU AI  (minimax with alpha-beta pruning, depth 4)
+// CPU AI (minimax with alpha-beta pruning)
 // ---------------------------------------------------------------------------
 
 private val WIN_LINES = listOf(
@@ -165,7 +163,6 @@ private val WIN_LINES = listOf(
 
 fun generateMoves(state: GameState, player: Player): List<Move> {
     val moves = mutableListOf<Move>()
-    // From hand
     for (size in PieceSize.entries) {
         if ((state.hand[player]?.get(size) ?: 0) <= 0) continue
         for (r in 0..2) for (c in 0..2) {
@@ -174,7 +171,6 @@ fun generateMoves(state: GameState, player: Player): List<Move> {
                 moves.add(Move(fromHandSize = size, toRow = r, toCol = c))
         }
     }
-    // From board
     for (fr in 0..2) for (fc in 0..2) {
         val piece = state.board[fr][fc].lastOrNull() ?: continue
         if (piece.player != player) continue
@@ -229,12 +225,10 @@ fun minimax(state: GameState, depth: Int, alpha: Int, beta: Int, cpu: Player): I
     }
 }
 
-fun getBestMove(state: GameState, cpu: Player): Move? {
-    val moves = generateMoves(state, cpu)
-    return moves.maxByOrNull { m ->
+fun getBestMove(state: GameState, cpu: Player): Move? =
+    generateMoves(state, cpu).maxByOrNull { m ->
         minimax(applyMove(state, m), depth = 3, -9999, 9999, cpu)
     }
-}
 
 // ---------------------------------------------------------------------------
 // Activity
@@ -331,10 +325,10 @@ fun TitleScreen(onStart2P: () -> Unit, onStartCpu: () -> Unit, onHowToPlay: () -
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF4E342E)),
                 border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.5.dp)
-            ) { Text("遺び方", fontSize = 15.sp) }
+            ) { Text("あそびかた", fontSize = 15.sp) }
         }
 
-        Text("同一端末・2人対面プレイ対応", fontSize = 12.sp, color = Color(0xFF8D6E63))
+        Text("スマホ1台で 2人がはんたいできるよ！", fontSize = 12.sp, color = Color(0xFF8D6E63))
     }
 }
 
@@ -351,35 +345,53 @@ fun HowToPlayScreen(onBack: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る", tint = Color(0xFF4E342E))
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ほどく", tint = Color(0xFF4E342E))
             }
-            Text("遺び方", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4E342E))
+            Text("あそびかた", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4E342E))
         }
         HorizontalDivider(color = Color(0xFFD7CCC8))
         Column(
             modifier = Modifier.verticalScroll(scrollState).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            RuleSection("🎯", "ゲームの目的",
-                "ネコチームとイヌチームの２人対戦ボードゲーム。\n3×3のマスに自分の馨を広げて、縦・横・斜めに3つ並べた方が勝ちです。")
-            RuleSection("🐱", "馨について",
-                "各チームにS（小）・M（中）・L（大）の馨がそれぞれ2個ずつ、合計6個あります。\n\n🐱 S ：小さなネコ\n🐈 M ：中くらいのネコ\n🦁 L ：大きなライオン")
-            RuleSection("💪", "馨の大小関係",
-                "大きい馨は小さい馨の上に被せて隠せます。\nL > M > S の順。同じ大きさや小さい馨を被せることはできません。")
-            RuleSection("🔄", "手番でできること",
-                "一回の手番で次のどちらか1つを行います。\n\n▶ 手持ちの馨を盤面に置く\n▶ 盤面上の自分の馨を持ち上げて別のマスへ移動")
-            RuleSection("⚠️", "リベールルール（重要）",
-                "盤面上の馨を持ち上げた瞬間、隠れていた相手の馨が現れて相手の3並びが成立→ その場で相手の勝ち。\n持ち上げた馨でブロックしようとしても無効です。馨を動かす前によく考えましょう！",
-                highlight = true)
-            RuleSection("📱", "対面プレイ",
-                "同じスマホ1台でテーブルを挑んで対戦できます。\n画面上部（相手側）は180°回転表示。")
+            RuleSection(
+                emoji = "🎯",
+                title = "どうやって かつの？",
+                body = "ネコチーム ― イヌチームの２人対戦ゲームだよ！\n\n3×3のマスに自分のこまをならべて、みっつが\n・たて\n・よこ\n・ななめ\nに3つつながったら 🏆 かちだよ！"
+            )
+            RuleSection(
+                emoji = "🐱",
+                title = "こまのせつめい",
+                body = "それぞれのチームに、\n小・中・大の3しゅるいのこまが 2まいずつあるよ。\n\n🐱 小：ちびネコ\n🐈 中：フツウネコ\n🦁 大：ライオン"
+            )
+            RuleSection(
+                emoji = "💪",
+                title = "おおきいこまはつよい！",
+                body = "おおきいこまは、ちいさいこまの上にかぶせて かくす ことができるよ！\n\n大 > 中 > 小 のじゅんでつよいよ。\nおなじおおきさや、ちいさいこまをかぶせることはできないよ。"
+            )
+            RuleSection(
+                emoji = "🔄",
+                title = "じぶんのばんで できること",
+                body = "1かいのばんで、つぎのどちらかひとつをやるよ。\n\n▶ てもちのこまをマスにおく\n▶ はんのじぶんのこまをもちあげて べつのマスにうごかす"
+            )
+            RuleSection(
+                emoji = "⚠️",
+                title = "とくべつのルール！",
+                body = "はんのこまをもちあげたとき、かくれていたあいてのこまがでてきて あいての3つなぎができたら\n→ そこで あいてのかちになるよ！\n\nもちあげたこまでブロックしようとしても ダメだよ。\nこまをうごかすまえに、よーくかんがえてね！",
+                highlight = true
+            )
+            RuleSection(
+                emoji = "📱",
+                title = "おもたのまわりプレイ",
+                body = "スマホ1台で、テーブルをはさんで 2人でたたかえるよ。\n画面の上があいてのエリア（さかさまひょうじ）、下が自分のエリアだよ。"
+            )
             Spacer(Modifier.height(8.dp))
             Button(
                 onClick = onBack,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF8F00))
-            ) { Text("タイトルに戻る", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+            ) { Text("タイトルにほどく", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
             Spacer(Modifier.height(8.dp))
         }
     }
@@ -444,14 +456,12 @@ fun GameScreen(onBackToTitle: () -> Unit = {}, isCpuMode: Boolean = false) {
         verticalArrangement = Arrangement.SpaceBetween,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Player TWO area (top)
-        // CPU mode: no rotation needed (no second human); 2P mode: 180° for face-to-face
         Column(
             modifier = if (isCpuMode) Modifier else Modifier.rotate(180f),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             if (cpuThinking) {
-                Text("🤖 考え中…", color = Player.TWO.color, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Text("🤖 かんがえてる…", color = Player.TWO.color, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             }
             PlayerArea(
                 player = Player.TWO,
@@ -522,7 +532,7 @@ fun PlayerArea(
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         Text(
-            text = if (isCurrentPlayer) "あなたのターンです" else "",
+            text = if (isCurrentPlayer) "あなたのバンだよ！" else "",
             color = player.color, fontSize = 13.sp, fontWeight = FontWeight.Bold
         )
         Text(player.label, color = player.color, fontSize = 16.sp, fontWeight = FontWeight.Bold)
@@ -631,10 +641,12 @@ fun WinnerDialog(winner: Player, isCpuMode: Boolean, onReset: () -> Unit, onBack
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(if (isCpuWon) "🤖 CPUの勝ち！" else "🏆 ゲーム終了！",
-                    fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 Text(
-                    text = if (isCpuWon) "また挑戦してみよう！" else "${winner.label}\nの勝ち！",
+                    if (isCpuWon) "🤖 CPUのかち！" else "🏆 ゲームおわり！",
+                    fontSize = 22.sp, fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = if (isCpuWon) "もういっかい ちゃれんじゃない！" else "${winner.label}\nのかち！",
                     fontSize = 20.sp, fontWeight = FontWeight.Bold,
                     color = winner.color, textAlign = TextAlign.Center
                 )
@@ -642,11 +654,11 @@ fun WinnerDialog(winner: Player, isCpuMode: Boolean, onReset: () -> Unit, onBack
                     onClick = onReset,
                     modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = winner.color)
-                ) { Text("もう一度プレイ", fontSize = 16.sp) }
+                ) { Text("もういっかい！", fontSize = 16.sp) }
                 OutlinedButton(
                     onClick = onBackToTitle,
                     modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)
-                ) { Text("タイトルに戻る", fontSize = 14.sp) }
+                ) { Text("タイトルにほどく", fontSize = 14.sp) }
             }
         }
     }
