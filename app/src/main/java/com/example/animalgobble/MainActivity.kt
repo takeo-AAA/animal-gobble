@@ -419,7 +419,7 @@ fun GameScreen(
     if (showQuitConfirm) {
         AlertDialog(
             onDismissRequest = { showQuitConfirm = false },
-            title = { Text("かくにんする？", fontWeight = FontWeight.Bold) },
+            title = { Text("やめますか？", fontWeight = FontWeight.Bold) },
             text = { Text("ほんとうにやめる？") },
             confirmButton = {
                 TextButton(onClick = { showQuitConfirm = false; onQuit() }) {
@@ -427,7 +427,9 @@ fun GameScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showQuitConfirm = false }) { Text("つづける") }
+                TextButton(onClick = { showQuitConfirm = false }) {
+                    Text("つづける")
+                }
             }
         )
     }
@@ -721,9 +723,8 @@ fun WinnerDialog(
             ) {
                 Text("🏆 ゲーム終了！", fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 val winText = if (isCpuMode) {
-                    if (winner == Player.ONE) "あなたの勝ち！
-🎉" else "CPUの勝ち！
-😔"
+                    if (winner == Player.ONE) "あなたの勝ち！\n🎉"
+                    else "CPUの勝ち！\n😔"
                 } else {
                     "${winner.label}\nの勝ち！"
                 }
@@ -741,7 +742,7 @@ fun WinnerDialog(
                     Text("もう一度プレイ", fontSize = 16.sp)
                 }
                 TextButton(onClick = onQuit) {
-                    Text("タイトルに戻る", color = Color.Gray)
+                    Text("タイトルにもどる", color = Color.Gray)
                 }
             }
         }
