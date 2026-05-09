@@ -562,6 +562,7 @@ fun GameScreen(onBackToTitle: () -> Unit = {}, isCpuMode: Boolean = false) {
     val cpuPlayer = if (isCpuMode) Player.TWO else null
     var gameState by remember { mutableStateOf(GameState()) }
     var cpuThinking by remember { mutableStateOf(false) }
+    var showQuitConfirm by remember { mutableStateOf(false) }
     LaunchedEffect(gameState.currentPlayer, gameState.winner) {
         if (cpuPlayer != null && gameState.winner == null && gameState.currentPlayer == cpuPlayer) {
             cpuThinking = true; delay(500)
@@ -573,21 +574,78 @@ fun GameScreen(onBackToTitle: () -> Unit = {}, isCpuMode: Boolean = false) {
     if (gameState.winner != null) {
         WinnerDialog(gameState.winner!!, isCpuMode, onReset = { gameState = GameState() }, onBackToTitle)
     }
+    if (showQuitConfirm) {
+        Dialog(onDismissRequest = { showQuitConfirm = false }) {
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                modifier = Modifier.padding(8.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text("🏠", fontSize = 36.sp)
+                    Text(
+                        "ほんとうにやめる？",
+                        fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4E342E)
+                    )
+                    Text(
+                        "タイトルにもどります。\nゲームのけっかはきえます。",
+                        fontSize = 13.sp, color = Color(0xFF8D6E63),
+                        textAlign = TextAlign.Center
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { showQuitConfirm = false },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) { Text("つづける", fontSize = 15.sp) }
+                        Button(
+                            onClick = onBackToTitle,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE57373))
+                        ) { Text("やめる", fontSize = 15.sp, fontWeight = FontWeight.Bold) }
+                    }
+                }
+            }
+        }
+    }
     Column(
         modifier = Modifier.fillMaxSize().systemBarsPadding().padding(8.dp),
         verticalArrangement = Arrangement.SpaceBetween,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Column(
-            modifier = if (isCpuMode) Modifier else Modifier.rotate(180f),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            if (cpuThinking) Text("🤖 かんがえてる…", color = Player.TWO.color, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-            PlayerArea(Player.TWO, gameState, gameState.currentPlayer == Player.TWO, !isCpuMode) { size ->
-                if (!isCpuMode && gameState.currentPlayer == Player.TWO) {
-                    gameState = gameState.copy(
-                        selectedHandPiece = if (gameState.selectedHandPiece == size) null else size,
-                        selectedBoardPos = null)
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            if (gameState.winner == null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(
+                        onClick = { showQuitConfirm = true },
+                        colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFF8D6E63))
+                    ) {
+                        Text("🏠 やめる", fontSize = 12.sp)
+                    }
+                }
+            }
+            Column(
+                modifier = if (isCpuMode) Modifier else Modifier.rotate(180f),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                if (cpuThinking) Text("🤖 かんがえてる…", color = Player.TWO.color, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                PlayerArea(Player.TWO, gameState, gameState.currentPlayer == Player.TWO, !isCpuMode) { size ->
+                    if (!isCpuMode && gameState.currentPlayer == Player.TWO) {
+                        gameState = gameState.copy(
+                            selectedHandPiece = if (gameState.selectedHandPiece == size) null else size,
+                            selectedBoardPos = null)
+                    }
                 }
             }
         }
