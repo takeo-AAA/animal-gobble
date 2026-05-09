@@ -28,6 +28,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -72,231 +73,149 @@ data class Move(
 )
 
 // ---------------------------------------------------------------------------
-// Characters — kawaii flat style (title screen / player area / win dialog)
+// Cat — integrated ear+face silhouette path, almond eyes
 // ---------------------------------------------------------------------------
+
+private fun catFacePath(cx: Float, cy: Float, r: Float) = Path().apply {
+    moveTo(cx, cy + r * 0.88f)
+    quadraticBezierTo(cx + r*0.82f, cy + r*0.88f, cx + r,       cy + r*0.42f)
+    quadraticBezierTo(cx + r*0.98f, cy - r*0.06f, cx + r*0.92f, cy - r*0.16f)
+    lineTo(cx + r*0.48f, cy - r*1.14f)          // right ear tip
+    lineTo(cx + r*0.16f, cy - r*0.58f)          // right notch
+    quadraticBezierTo(cx, cy - r*0.66f, cx - r*0.16f, cy - r*0.58f)
+    lineTo(cx - r*0.48f, cy - r*1.14f)          // left ear tip
+    lineTo(cx - r*0.92f, cy - r*0.16f)          // left notch
+    quadraticBezierTo(cx - r*0.98f, cy - r*0.06f, cx - r,       cy + r*0.42f)
+    quadraticBezierTo(cx - r*0.82f, cy + r*0.88f, cx, cy + r*0.88f)
+    close()
+}
+
+private fun catInnerEar(cx: Float, cy: Float, r: Float, sign: Float) = Path().apply {
+    moveTo(cx + sign*r*0.86f, cy - r*0.20f)
+    lineTo(cx + sign*r*0.48f, cy - r*0.94f)
+    lineTo(cx + sign*r*0.19f, cy - r*0.54f)
+    close()
+}
+
+private fun drawCatFace(drawScope: androidx.compose.ui.graphics.drawscope.DrawScope, cx: Float, cy: Float, r: Float, full: Boolean) {
+    with(drawScope) {
+        val dk = Color(0xFF2D1B00)
+        val ol = Stroke(r * 0.10f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        val face = catFacePath(cx, cy, r)
+        drawPath(face, Color(0xFFFFF0D0))
+        drawPath(face, dk, style = ol)
+        drawPath(catInnerEar(cx, cy, r,  1f), Color(0xFFFB8C00))
+        drawPath(catInnerEar(cx, cy, r, -1f), Color(0xFFFB8C00))
+        // cheeks
+        drawCircle(Color(0x88F8BBD0), r*0.22f, Offset(cx - r*0.62f, cy + r*0.38f))
+        drawCircle(Color(0x88F8BBD0), r*0.22f, Offset(cx + r*0.62f, cy + r*0.38f))
+        // almond eyes
+        val ew = r*0.44f; val eh = r*0.28f
+        drawOval(dk, topLeft=Offset(cx - r*0.52f, cy - r*0.22f), size=Size(ew, eh))
+        drawOval(dk, topLeft=Offset(cx + r*0.08f, cy - r*0.22f), size=Size(ew, eh))
+        drawCircle(Color.White, r*0.085f, Offset(cx - r*0.23f, cy - r*0.14f))
+        drawCircle(Color.White, r*0.085f, Offset(cx + r*0.37f, cy - r*0.14f))
+        // nose
+        drawPath(Path().apply {
+            moveTo(cx, cy + r*0.16f); lineTo(cx - r*0.12f, cy + r*0.04f); lineTo(cx + r*0.12f, cy + r*0.04f); close()
+        }, Color(0xFFFF80AB))
+        // mouth W
+        drawPath(Path().apply {
+            moveTo(cx - r*0.40f, cy + r*0.28f)
+            quadraticBezierTo(cx - r*0.18f, cy + r*0.50f, cx, cy + r*0.38f)
+            quadraticBezierTo(cx + r*0.18f, cy + r*0.50f, cx + r*0.40f, cy + r*0.28f)
+        }, dk, style = Stroke(r*0.07f, cap = StrokeCap.Round))
+        // whiskers (full version only)
+        if (full) {
+            val wc = Color(0x90424242); val ws = r*0.038f
+            listOf(-r*0.12f, r*0.04f, r*0.18f).forEach { yo ->
+                drawLine(wc, Offset(cx - r*0.16f, cy + yo), Offset(cx - r*0.96f, cy + yo - r*0.10f), ws, StrokeCap.Round)
+                drawLine(wc, Offset(cx + r*0.16f, cy + yo), Offset(cx + r*0.96f, cy + yo - r*0.10f), ws, StrokeCap.Round)
+            }
+        }
+    }
+}
 
 @Composable
 fun CatCharacter(sizeDp: Dp, modifier: Modifier = Modifier) {
     Canvas(modifier = modifier.size(sizeDp)) {
-        val s  = size.minDimension
-        val cx = size.width / 2f
-        val cy = size.height / 2f + s * 0.08f
-        val r  = s * 0.37f
-        val dk = Color(0xFF3E2723)   // dark brown outline
-        val ow = r * 0.13f
+        val s = size.minDimension
+        drawCatFace(this, size.width/2f, size.height/2f + s*0.06f, s*0.40f, full = true)
+    }
+}
 
-        // ears — outlined triangles
-        fun earOuter(sg: Float) = Path().apply {
-            moveTo(cx + sg*r*0.62f, cy - r*0.74f)
-            lineTo(cx + sg*r*0.36f, cy - r*1.40f)
-            lineTo(cx + sg*r*0.02f, cy - r*0.87f); close()
-        }
-        fun earFill(sg: Float) = Path().apply {
-            moveTo(cx + sg*r*0.57f, cy - r*0.80f)
-            lineTo(cx + sg*r*0.36f, cy - r*1.22f)
-            lineTo(cx + sg*r*0.06f, cy - r*0.91f); close()
-        }
-        fun earInner(sg: Float) = Path().apply {
-            moveTo(cx + sg*r*0.51f, cy - r*0.87f)
-            lineTo(cx + sg*r*0.36f, cy - r*1.06f)
-            lineTo(cx + sg*r*0.10f, cy - r*0.93f); close()
-        }
-        listOf(-1f, 1f).forEach { sg ->
-            drawPath(earOuter(sg), dk)
-            drawPath(earFill(sg),  Color(0xFFFB8C00))
-            drawPath(earInner(sg), Color(0xFFF8BBD0))
-        }
+@Composable
+fun CatPiece(sizeDp: Dp, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(sizeDp)) {
+        val s = size.minDimension
+        drawCatFace(this, size.width/2f, size.height/2f + s*0.06f, s*0.40f, full = false)
+    }
+}
 
-        // face
-        drawCircle(dk, r + ow, Offset(cx, cy))
-        drawCircle(Color(0xFFFFF8E1), r, Offset(cx, cy))
+// ---------------------------------------------------------------------------
+// Dog — wide oval face, large drooping teardrop ears
+// ---------------------------------------------------------------------------
 
+private fun dogEarPath(cx: Float, cy: Float, r: Float, sign: Float) = Path().apply {
+    moveTo(cx + sign*r*0.48f, cy - r*0.26f)
+    quadraticBezierTo(cx + sign*r*1.28f, cy + r*0.10f, cx + sign*r*1.18f, cy + r*0.88f)
+    quadraticBezierTo(cx + sign*r*1.06f, cy + r*1.36f, cx + sign*r*0.50f, cy + r*1.06f)
+    quadraticBezierTo(cx + sign*r*0.14f, cy + r*0.68f, cx + sign*r*0.28f, cy + r*0.02f)
+    close()
+}
+
+private fun drawDogFace(drawScope: androidx.compose.ui.graphics.drawscope.DrawScope, cx: Float, cy: Float, r: Float) {
+    with(drawScope) {
+        val dk = Color(0xFF1A237E)
+        val eb = Color(0xFF6D4C41)
+        val ol = Stroke(r*0.10f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        // ears
+        listOf(1f, -1f).forEach { sg ->
+            val ep = dogEarPath(cx, cy, r, sg)
+            drawPath(ep, eb)
+            drawPath(ep, dk, style = ol)
+        }
+        // face oval
+        val frx = r*1.02f; val fry = r*0.90f
+        drawOval(Color(0xFFFFF8E1), topLeft=Offset(cx-frx, cy-fry), size=Size(frx*2, fry*2))
+        drawOval(dk, topLeft=Offset(cx-frx, cy-fry), size=Size(frx*2, fry*2), style=Stroke(r*0.10f))
+        // muzzle
+        drawOval(Color(0xFFFFECB3), topLeft=Offset(cx-r*0.36f, cy+r*0.06f), size=Size(r*0.72f, r*0.54f))
         // cheeks
-        drawCircle(Color(0x88F8BBD0), r*0.22f, Offset(cx - r*0.54f, cy + r*0.26f))
-        drawCircle(Color(0x88F8BBD0), r*0.22f, Offset(cx + r*0.54f, cy + r*0.26f))
-
+        drawCircle(Color(0x88F8BBD0), r*0.22f, Offset(cx - r*0.66f, cy + r*0.32f))
+        drawCircle(Color(0x88F8BBD0), r*0.22f, Offset(cx + r*0.66f, cy + r*0.32f))
         // eyes
-        drawCircle(dk, r*0.25f, Offset(cx - r*0.30f, cy - r*0.14f))
-        drawCircle(dk, r*0.25f, Offset(cx + r*0.30f, cy - r*0.14f))
-        drawCircle(Color.White, r*0.10f, Offset(cx - r*0.20f, cy - r*0.24f))
-        drawCircle(Color.White, r*0.10f, Offset(cx + r*0.40f, cy - r*0.24f))
-        drawCircle(Color.White, r*0.055f, Offset(cx - r*0.40f, cy - r*0.08f))
-        drawCircle(Color.White, r*0.055f, Offset(cx + r*0.20f, cy - r*0.08f))
-
-        // nose — pink triangle
+        drawCircle(Color(0xFF212121), r*0.22f, Offset(cx - r*0.30f, cy - r*0.24f))
+        drawCircle(Color(0xFF212121), r*0.22f, Offset(cx + r*0.30f, cy - r*0.24f))
+        drawCircle(Color.White, r*0.085f, Offset(cx - r*0.20f, cy - r*0.32f))
+        drawCircle(Color.White, r*0.085f, Offset(cx + r*0.40f, cy - r*0.32f))
+        // nose (large, prominent)
+        drawOval(Color(0xFF212121), topLeft=Offset(cx-r*0.26f, cy+r*0.08f), size=Size(r*0.52f, r*0.36f))
+        drawCircle(Color(0x60FFFFFF), r*0.09f, Offset(cx-r*0.10f, cy+r*0.16f))
+        // smile + tongue
         drawPath(Path().apply {
-            moveTo(cx, cy + r*0.10f)
-            lineTo(cx - r*0.12f, cy - r*0.04f)
-            lineTo(cx + r*0.12f, cy - r*0.04f); close()
-        }, Color(0xFFFF80AB))
-
-        // mouth — W
-        drawPath(Path().apply {
-            moveTo(cx - r*0.38f, cy + r*0.22f)
-            quadraticBezierTo(cx - r*0.18f, cy + r*0.42f, cx, cy + r*0.30f)
-            quadraticBezierTo(cx + r*0.18f, cy + r*0.42f, cx + r*0.38f, cy + r*0.22f)
-        }, dk, style = Stroke(r*0.07f, cap = StrokeCap.Round))
-
-        // whiskers
-        val wc = Color(0x90616161); val ws = r*0.04f
-        listOf(-1, 0, 1).forEach { i ->
-            val yo = i * r * 0.13f
-            drawLine(wc, Offset(cx - r*0.14f, cy + r*0.04f + yo), Offset(cx - r*0.86f, cy - r*0.06f + yo), ws, StrokeCap.Round)
-            drawLine(wc, Offset(cx + r*0.14f, cy + r*0.04f + yo), Offset(cx + r*0.86f, cy - r*0.06f + yo), ws, StrokeCap.Round)
-        }
+            moveTo(cx - r*0.42f, cy + r*0.36f)
+            quadraticBezierTo(cx - r*0.18f, cy + r*0.60f, cx, cy + r*0.50f)
+            quadraticBezierTo(cx + r*0.18f, cy + r*0.60f, cx + r*0.42f, cy + r*0.36f)
+        }, Color(0xFF212121), style = Stroke(r*0.08f, cap = StrokeCap.Round))
+        drawOval(Color(0xFFF48FB1), topLeft=Offset(cx-r*0.16f, cy+r*0.46f), size=Size(r*0.32f, r*0.26f))
+        drawLine(Color(0xFFE91E63), Offset(cx, cy+r*0.46f), Offset(cx, cy+r*0.70f), r*0.04f, StrokeCap.Round)
     }
 }
 
 @Composable
 fun DogCharacter(sizeDp: Dp, modifier: Modifier = Modifier) {
     Canvas(modifier = modifier.size(sizeDp)) {
-        val s  = size.minDimension
-        val cx = size.width / 2f
-        val cy = size.height / 2f + s * 0.04f
-        val r  = s * 0.36f
-        val nv = Color(0xFF1A237E)   // dark navy outline
-        val ow = r * 0.13f
-        val eb = Color(0xFF8D6E63)   // ear brown
-
-        // floppy ears
-        drawOval(nv, topLeft = Offset(cx - r*1.28f, cy - r*0.30f), size = Size(r*0.70f, r*1.12f))
-        drawOval(eb, topLeft = Offset(cx - r*1.22f, cy - r*0.24f), size = Size(r*0.58f, r*0.96f))
-        drawOval(Color(0xFFA1887F), topLeft = Offset(cx - r*1.14f, cy - r*0.10f), size = Size(r*0.38f, r*0.68f))
-        drawOval(nv, topLeft = Offset(cx + r*0.58f, cy - r*0.30f), size = Size(r*0.70f, r*1.12f))
-        drawOval(eb, topLeft = Offset(cx + r*0.64f, cy - r*0.24f), size = Size(r*0.58f, r*0.96f))
-        drawOval(Color(0xFFA1887F), topLeft = Offset(cx + r*0.76f, cy - r*0.10f), size = Size(r*0.38f, r*0.68f))
-
-        // face
-        drawCircle(nv, r + ow, Offset(cx, cy))
-        drawCircle(Color(0xFFFFF8E1), r, Offset(cx, cy))
-
-        // muzzle
-        drawOval(Color(0xFFFFECB3), topLeft = Offset(cx - r*0.34f, cy + r*0.08f), size = Size(r*0.68f, r*0.52f))
-
-        // cheeks
-        drawCircle(Color(0x88F8BBD0), r*0.21f, Offset(cx - r*0.58f, cy + r*0.28f))
-        drawCircle(Color(0x88F8BBD0), r*0.21f, Offset(cx + r*0.58f, cy + r*0.28f))
-
-        // eyes
-        drawCircle(Color(0xFF212121), r*0.25f, Offset(cx - r*0.30f, cy - r*0.18f))
-        drawCircle(Color(0xFF212121), r*0.25f, Offset(cx + r*0.30f, cy - r*0.18f))
-        drawCircle(Color.White, r*0.10f, Offset(cx - r*0.20f, cy - r*0.26f))
-        drawCircle(Color.White, r*0.10f, Offset(cx + r*0.40f, cy - r*0.26f))
-        drawCircle(Color.White, r*0.055f, Offset(cx - r*0.40f, cy - r*0.12f))
-        drawCircle(Color.White, r*0.055f, Offset(cx + r*0.20f, cy - r*0.12f))
-
-        // nose
-        drawOval(Color(0xFF4E342E), topLeft = Offset(cx - r*0.20f, cy + r*0.10f), size = Size(r*0.40f, r*0.28f))
-        drawCircle(Color(0x60FFFFFF), r*0.07f, Offset(cx - r*0.08f, cy + r*0.16f))
-
-        // mouth + tongue
-        val sw = r * 0.07f
-        drawLine(Color(0xFF4E342E), Offset(cx, cy + r*0.38f), Offset(cx, cy + r*0.50f), sw, StrokeCap.Round)
-        drawPath(Path().apply {
-            moveTo(cx, cy + r*0.50f)
-            quadraticBezierTo(cx - r*0.22f, cy + r*0.68f, cx - r*0.40f, cy + r*0.58f)
-        }, Color(0xFF4E342E), style = Stroke(sw, cap = StrokeCap.Round))
-        drawPath(Path().apply {
-            moveTo(cx, cy + r*0.50f)
-            quadraticBezierTo(cx + r*0.22f, cy + r*0.68f, cx + r*0.40f, cy + r*0.58f)
-        }, Color(0xFF4E342E), style = Stroke(sw, cap = StrokeCap.Round))
-        drawOval(Color(0xFFF48FB1), topLeft = Offset(cx - r*0.15f, cy + r*0.46f), size = Size(r*0.30f, r*0.24f))
-        drawLine(Color(0xFFE91E63), Offset(cx, cy + r*0.46f), Offset(cx, cy + r*0.68f), r*0.04f, StrokeCap.Round)
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Piece icons — simplified bold versions for board cells and hand buttons
-// ---------------------------------------------------------------------------
-
-@Composable
-fun CatPiece(sizeDp: Dp, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier.size(sizeDp)) {
-        val s  = size.minDimension
-        val cx = size.width / 2f
-        val cy = size.height / 2f + s * 0.07f
-        val r  = s * 0.36f
-        val dk = Color(0xFF3E2723)
-        val ow = r * 0.14f
-
-        fun earOuter(sg: Float) = Path().apply {
-            moveTo(cx + sg*r*0.60f, cy - r*0.74f)
-            lineTo(cx + sg*r*0.36f, cy - r*1.30f)
-            lineTo(cx + sg*r*0.03f, cy - r*0.87f); close()
-        }
-        fun earFill(sg: Float) = Path().apply {
-            moveTo(cx + sg*r*0.55f, cy - r*0.80f)
-            lineTo(cx + sg*r*0.36f, cy - r*1.12f)
-            lineTo(cx + sg*r*0.07f, cy - r*0.91f); close()
-        }
-        listOf(-1f, 1f).forEach { sg ->
-            drawPath(earOuter(sg), dk)
-            drawPath(earFill(sg),  Color(0xFFFB8C00))
-        }
-
-        drawCircle(dk, r + ow, Offset(cx, cy))
-        drawCircle(Color(0xFFFFF8E1), r, Offset(cx, cy))
-
-        drawCircle(Color(0x88F8BBD0), r*0.20f, Offset(cx - r*0.52f, cy + r*0.26f))
-        drawCircle(Color(0x88F8BBD0), r*0.20f, Offset(cx + r*0.52f, cy + r*0.26f))
-
-        drawCircle(dk, r*0.23f, Offset(cx - r*0.30f, cy - r*0.14f))
-        drawCircle(dk, r*0.23f, Offset(cx + r*0.30f, cy - r*0.14f))
-        drawCircle(Color.White, r*0.09f, Offset(cx - r*0.20f, cy - r*0.22f))
-        drawCircle(Color.White, r*0.09f, Offset(cx + r*0.40f, cy - r*0.22f))
-
-        drawCircle(Color(0xFFFF80AB), r*0.085f, Offset(cx, cy + r*0.10f))
-
-        drawPath(Path().apply {
-            moveTo(cx - r*0.36f, cy + r*0.22f)
-            quadraticBezierTo(cx - r*0.16f, cy + r*0.38f, cx, cy + r*0.28f)
-            quadraticBezierTo(cx + r*0.16f, cy + r*0.38f, cx + r*0.36f, cy + r*0.22f)
-        }, dk, style = Stroke(r*0.09f, cap = StrokeCap.Round))
+        val s = size.minDimension
+        drawDogFace(this, size.width/2f, size.height/2f - s*0.04f, s*0.37f)
     }
 }
 
 @Composable
 fun DogPiece(sizeDp: Dp, modifier: Modifier = Modifier) {
     Canvas(modifier = modifier.size(sizeDp)) {
-        val s  = size.minDimension
-        val cx = size.width / 2f
-        val cy = size.height / 2f + s * 0.04f
-        val r  = s * 0.34f
-        val nv = Color(0xFF1A237E)
-        val ow = r * 0.14f
-        val eb = Color(0xFF8D6E63)
-
-        drawOval(nv, topLeft = Offset(cx - r*1.22f, cy - r*0.28f), size = Size(r*0.64f, r*0.96f))
-        drawOval(eb, topLeft = Offset(cx - r*1.16f, cy - r*0.22f), size = Size(r*0.52f, r*0.82f))
-        drawOval(nv, topLeft = Offset(cx + r*0.58f, cy - r*0.28f), size = Size(r*0.64f, r*0.96f))
-        drawOval(eb, topLeft = Offset(cx + r*0.64f, cy - r*0.22f), size = Size(r*0.52f, r*0.82f))
-
-        drawCircle(nv, r + ow, Offset(cx, cy))
-        drawCircle(Color(0xFFFFF8E1), r, Offset(cx, cy))
-
-        drawOval(Color(0xFFFFECB3), topLeft = Offset(cx - r*0.30f, cy + r*0.08f), size = Size(r*0.60f, r*0.48f))
-
-        drawCircle(Color(0x88F8BBD0), r*0.18f, Offset(cx - r*0.54f, cy + r*0.28f))
-        drawCircle(Color(0x88F8BBD0), r*0.18f, Offset(cx + r*0.54f, cy + r*0.28f))
-
-        drawCircle(Color(0xFF212121), r*0.22f, Offset(cx - r*0.28f, cy - r*0.16f))
-        drawCircle(Color(0xFF212121), r*0.22f, Offset(cx + r*0.28f, cy - r*0.16f))
-        drawCircle(Color.White, r*0.085f, Offset(cx - r*0.18f, cy - r*0.24f))
-        drawCircle(Color.White, r*0.085f, Offset(cx + r*0.38f, cy - r*0.24f))
-
-        drawOval(Color(0xFF4E342E), topLeft = Offset(cx - r*0.16f, cy + r*0.10f), size = Size(r*0.32f, r*0.24f))
-
-        val sw = r * 0.08f
-        drawLine(Color(0xFF4E342E), Offset(cx, cy + r*0.34f), Offset(cx, cy + r*0.44f), sw, StrokeCap.Round)
-        drawPath(Path().apply {
-            moveTo(cx, cy + r*0.44f)
-            quadraticBezierTo(cx - r*0.18f, cy + r*0.58f, cx - r*0.32f, cy + r*0.50f)
-        }, Color(0xFF4E342E), style = Stroke(sw, cap = StrokeCap.Round))
-        drawPath(Path().apply {
-            moveTo(cx, cy + r*0.44f)
-            quadraticBezierTo(cx + r*0.18f, cy + r*0.58f, cx + r*0.32f, cy + r*0.50f)
-        }, Color(0xFF4E342E), style = Stroke(sw, cap = StrokeCap.Round))
-        drawOval(Color(0xFFF48FB1), topLeft = Offset(cx - r*0.11f, cy + r*0.40f), size = Size(r*0.22f, r*0.18f))
+        val s = size.minDimension
+        drawDogFace(this, size.width/2f, size.height/2f - s*0.04f, s*0.37f)
     }
 }
 
@@ -448,9 +367,9 @@ fun AppHost() {
     var screen    by remember { mutableStateOf(AppScreen.TITLE) }
     var isCpuMode by remember { mutableStateOf(false) }
     when (screen) {
-        AppScreen.TITLE      -> TitleScreen(
-            onStart2P  = { isCpuMode = false; screen = AppScreen.GAME },
-            onStartCpu = { isCpuMode = true;  screen = AppScreen.GAME },
+        AppScreen.TITLE       -> TitleScreen(
+            onStart2P   = { isCpuMode = false; screen = AppScreen.GAME },
+            onStartCpu  = { isCpuMode = true;  screen = AppScreen.GAME },
             onHowToPlay = { screen = AppScreen.HOW_TO_PLAY }
         )
         AppScreen.HOW_TO_PLAY -> HowToPlayScreen(onBack = { screen = AppScreen.TITLE })
@@ -479,11 +398,10 @@ fun TitleScreen(onStart2P: () -> Unit, onStartCpu: () -> Unit, onHowToPlay: () -
                     fontSize = 11.sp, color = Color(0xFF8D6E63))
             }
         }
-
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                CatCharacter(sizeDp = 108.dp)
+                CatCharacter(sizeDp = 110.dp)
                 Spacer(Modifier.height(6.dp))
                 Surface(shape = RoundedCornerShape(12.dp), color = Color(0xFFFF8F00)) {
                     Text("🐱 ネコチーム", modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
@@ -501,7 +419,7 @@ fun TitleScreen(onStart2P: () -> Unit, onStartCpu: () -> Unit, onHowToPlay: () -
                 }
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                DogCharacter(sizeDp = 108.dp)
+                DogCharacter(sizeDp = 110.dp)
                 Spacer(Modifier.height(6.dp))
                 Surface(shape = RoundedCornerShape(12.dp), color = Color(0xFF1565C0)) {
                     Text("🐶 イヌチーム", modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
@@ -509,7 +427,6 @@ fun TitleScreen(onStart2P: () -> Unit, onStartCpu: () -> Unit, onHowToPlay: () -
                 }
             }
         }
-
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Button(onClick = onStart2P, modifier = Modifier.fillMaxWidth().height(54.dp),
                 shape = RoundedCornerShape(16.dp),
@@ -525,7 +442,6 @@ fun TitleScreen(onStart2P: () -> Unit, onStartCpu: () -> Unit, onHowToPlay: () -
                 border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.5.dp)
             ) { Text("❓ あそびかた", fontSize = 15.sp) }
         }
-
         Text("スマホ1台で 2人がたのしめる！🎉", fontSize = 12.sp, color = Color(0xFF8D6E63))
     }
 }
@@ -615,7 +531,6 @@ fun GameScreen(onBackToTitle: () -> Unit = {}, isCpuMode: Boolean = false) {
     if (gameState.winner != null) {
         WinnerDialog(gameState.winner!!, isCpuMode, onReset = { gameState = GameState() }, onBackToTitle)
     }
-
     if (showQuitConfirm) {
         Dialog(onDismissRequest = { showQuitConfirm = false }) {
             Card(shape = RoundedCornerShape(20.dp),
@@ -727,7 +642,7 @@ fun PlayerArea(
 @Composable
 fun HandPieceButton(player: Player, size: PieceSize, count: Int, isSelected: Boolean, enabled: Boolean, onClick: () -> Unit) {
     val boxSize   = when (size) { PieceSize.SMALL -> 52.dp; PieceSize.MEDIUM -> 62.dp; PieceSize.LARGE -> 72.dp }
-    val pieceSize = when (size) { PieceSize.SMALL -> 24.dp; PieceSize.MEDIUM -> 32.dp; PieceSize.LARGE -> 42.dp }
+    val pieceSize = when (size) { PieceSize.SMALL -> 26.dp; PieceSize.MEDIUM -> 34.dp; PieceSize.LARGE -> 44.dp }
     Box(
         modifier = Modifier.size(boxSize).clip(RoundedCornerShape(10.dp))
             .background(if (isSelected) player.color.copy(0.3f) else Color.White.copy(alpha = if (enabled) 1f else 0.4f))
@@ -768,7 +683,7 @@ fun BoardCell(stack: List<Piece>, isSelected: Boolean, onClick: () -> Unit) {
         contentAlignment = Alignment.Center
     ) {
         if (topPiece != null) {
-            val pieceDp = when (topPiece.size) { PieceSize.SMALL -> 34.dp; PieceSize.MEDIUM -> 50.dp; PieceSize.LARGE -> 68.dp }
+            val pieceDp = when (topPiece.size) { PieceSize.SMALL -> 36.dp; PieceSize.MEDIUM -> 52.dp; PieceSize.LARGE -> 70.dp }
             if (topPiece.player == Player.ONE) CatPiece(pieceDp) else DogPiece(pieceDp)
         }
         if (stack.size > 1) {
@@ -788,7 +703,7 @@ fun WinnerDialog(winner: Player, isCpuMode: Boolean, onReset: () -> Unit, onBack
             Column(modifier = Modifier.padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (winner == Player.ONE) CatCharacter(64.dp) else DogCharacter(64.dp)
+                if (winner == Player.ONE) CatCharacter(72.dp) else DogCharacter(72.dp)
                 Text(if (isCpuWon) "🤖 CPUのかち！" else "🏆 ゲームおわり！",
                     fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 Text(
@@ -807,9 +722,7 @@ fun WinnerDialog(winner: Player, isCpuMode: Boolean, onReset: () -> Unit, onBack
 
 @Preview(showBackground = true)
 @Composable
-fun TitleScreenPreview() {
-    MaterialTheme { TitleScreen({}, {}, {}) }
-}
+fun TitleScreenPreview() { MaterialTheme { TitleScreen({}, {}, {}) } }
 
 @Preview(showBackground = true)
 @Composable
