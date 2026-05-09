@@ -274,61 +274,107 @@ fun TitleScreen(onStart2P: () -> Unit, onStartCpu: () -> Unit, onHowToPlay: () -
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceEvenly
     ) {
+        // App title block
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("🐾", fontSize = 56.sp)
-            Text(
-                "Animal Gobble",
-                fontSize = 34.sp, fontWeight = FontWeight.ExtraBold,
-                color = Color(0xFF4E342E), textAlign = TextAlign.Center
-            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("🐱", fontSize = 36.sp)
+                Text("🐶", fontSize = 36.sp)
+            }
             Spacer(Modifier.height(6.dp))
-            Text("アニマルゴブル", fontSize = 15.sp, color = Color(0xFF8D6E63))
+            Text(
+                text = "ねこVSいぬ！",
+                fontSize = 38.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color(0xFF4E342E),
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = "コマかくしバトル",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF8D6E63)
+            )
+            Spacer(Modifier.height(4.dp))
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = Color(0xFFEFEBE9)
+            ) {
+                Text(
+                    "Animal Gobble",
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp),
+                    fontSize = 11.sp,
+                    color = Color(0xFF8D6E63)
+                )
+            }
         }
 
+        // Team preview
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("🦁", fontSize = 52.sp); Text("🐈", fontSize = 36.sp); Text("🐱", fontSize = 24.sp)
+                Text("🦁", fontSize = 44.sp)
+                Text("🐈", fontSize = 30.sp)
+                Text("🐱", fontSize = 22.sp)
                 Spacer(Modifier.height(4.dp))
-                Text("🐱 ネコチーム", color = Color(0xFFFF8F00), fontWeight = FontWeight.Bold)
+                Text("🐱 ネコチーム", color = Color(0xFFFF8F00), fontWeight = FontWeight.Bold, fontSize = 14.sp)
             }
-            Text("VS", fontSize = 22.sp, fontWeight = FontWeight.Black, color = Color(0xFF8D6E63))
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("🐺", fontSize = 52.sp); Text("🐕", fontSize = 36.sp); Text("🐶", fontSize = 24.sp)
+                Text("✨VS✨", fontSize = 18.sp, fontWeight = FontWeight.Black, color = Color(0xFF8D6E63))
                 Spacer(Modifier.height(4.dp))
-                Text("🐶 イヌチーム", color = Color(0xFF1565C0), fontWeight = FontWeight.Bold)
+                Text("おおきいこまで", fontSize = 11.sp, color = Color(0xFF8D6E63))
+                Text("かくせ！", fontSize = 11.sp, color = Color(0xFF8D6E63))
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("🐺", fontSize = 44.sp)
+                Text("🐕", fontSize = 30.sp)
+                Text("🐶", fontSize = 22.sp)
+                Spacer(Modifier.height(4.dp))
+                Text("🐶 イヌチーム", color = Color(0xFF1565C0), fontWeight = FontWeight.Bold, fontSize = 14.sp)
             }
         }
 
+        // Buttons
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Button(
                 onClick = onStart2P,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
+                modifier = Modifier.fillMaxWidth().height(54.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF8F00))
-            ) { Text("👥 2人対戦", fontSize = 17.sp, fontWeight = FontWeight.Bold) }
+            ) {
+                Text("👥 2人でやる！", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
+            }
             Button(
                 onClick = onStartCpu,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
+                modifier = Modifier.fillMaxWidth().height(54.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1565C0))
-            ) { Text("🤖 CPU対戦", fontSize = 17.sp, fontWeight = FontWeight.Bold) }
+            ) {
+                Text("🤖 CPUとたたかう！", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
+            }
             OutlinedButton(
                 onClick = onHowToPlay,
                 modifier = Modifier.fillMaxWidth().height(46.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF4E342E)),
                 border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.5.dp)
-            ) { Text("あそびかた", fontSize = 15.sp) }
+            ) {
+                Text("❓ あそびかた", fontSize = 15.sp)
+            }
         }
 
-        Text("スマホ1台で 2人がはんたいできるよ！", fontSize = 12.sp, color = Color(0xFF8D6E63))
+        Text(
+            "スマホ1台で 2人がたのしめる！🎉",
+            fontSize = 12.sp, color = Color(0xFF8D6E63)
+        )
     }
 }
 
