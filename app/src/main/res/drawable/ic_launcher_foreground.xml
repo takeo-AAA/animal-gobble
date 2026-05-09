@@ -4,7 +4,150 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+
+    <!-- Split background: orange (cat side) left, blue (dog side) right -->
+    <path
+        android:fillColor="#FFA726"
+        android:pathData="M0,0 L54,0 L54,108 L0,108 Z" />
+    <path
+        android:fillColor="#42A5F5"
+        android:pathData="M54,0 L108,0 L108,108 L54,108 Z" />
+
+    <!-- ===== CAT (left, cx=33 cy=60 r=18) ===== -->
+
+    <!-- Cat head silhouette with pointy ears -->
+    <path
+        android:fillColor="#FFF8E1"
+        android:strokeColor="#3E2723"
+        android:strokeWidth="1.5"
+        android:pathData="M33,75.84 Q47.76,75.84 51,67.56 Q50.64,58.92 49.56,57.12 L41.64,39.48 L35.88,49.56 Q33,48.12 30.12,49.56 L24.36,39.48 L16.44,57.12 Q15.36,58.92 15,67.56 Q18.24,75.84 33,75.84 Z" />
+
+    <!-- Cat inner ears (warm orange) -->
+    <path
+        android:fillColor="#FF8A65"
+        android:pathData="M47,56 L41.5,42 L37,50 Z" />
+    <path
+        android:fillColor="#FF8A65"
+        android:pathData="M19,56 L24.5,42 L29,50 Z" />
+
+    <!-- Cat cheeks (pink, translucent) -->
+    <path
+        android:fillColor="#FFCCBC"
+        android:fillAlpha="0.75"
+        android:pathData="M21.5,65.5 A4.5,3 0 1 0 30.5,65.5 A4.5,3 0 1 0 21.5,65.5 Z" />
+    <path
+        android:fillColor="#FFCCBC"
+        android:fillAlpha="0.75"
+        android:pathData="M35.5,65.5 A4.5,3 0 1 0 44.5,65.5 A4.5,3 0 1 0 35.5,65.5 Z" />
+
+    <!-- Cat eyes (dark almond) -->
+    <path
+        android:fillColor="#3E2723"
+        android:pathData="M24.6,58.2 A3,2 0 1 0 30.6,58.2 A3,2 0 1 0 24.6,58.2 Z" />
+    <path
+        android:fillColor="#3E2723"
+        android:pathData="M35.4,58.2 A3,2 0 1 0 41.4,58.2 A3,2 0 1 0 35.4,58.2 Z" />
+
+    <!-- Cat eye highlights -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M54,30 C54,30 36,48 36,60 C36,69.94 44.06,78 54,78 C63.94,78 72,69.94 72,60 C72,48 54,30 54,30 Z" />
+        android:pathData="M28.1,57 A0.9,0.9 0 1 0 29.9,57 A0.9,0.9 0 1 0 28.1,57 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M39.1,57 A0.9,0.9 0 1 0 40.9,57 A0.9,0.9 0 1 0 39.1,57 Z" />
+
+    <!-- Cat nose (pink triangle, tip down) -->
+    <path
+        android:fillColor="#F48FB1"
+        android:pathData="M31,62 L35,62 L33,65 Z" />
+
+    <!-- Cat mouth (W arc) -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#3E2723"
+        android:strokeWidth="1.2"
+        android:pathData="M30,66.5 Q33,69.5 36,66.5" />
+
+    <!-- ===== DOG (right, cx=75 cy=60 r=16) ===== -->
+
+    <!-- Dog drooping ears (behind face) -->
+    <path
+        android:fillColor="#A1887F"
+        android:strokeColor="#4E342E"
+        android:strokeWidth="1"
+        android:pathData="M67.32,55.84 Q54.52,61.6 56.12,74.08 Q58.04,81.76 67,76.96 Q72.76,70.88 70.52,60.32 Z" />
+    <path
+        android:fillColor="#A1887F"
+        android:strokeColor="#4E342E"
+        android:strokeWidth="1"
+        android:pathData="M82.68,55.84 Q95.48,61.6 93.88,74.08 Q91.96,81.76 83,76.96 Q77.24,70.88 79.48,60.32 Z" />
+
+    <!-- Dog face oval (cream, dark outline) -->
+    <path
+        android:fillColor="#FFF8E1"
+        android:strokeColor="#3E2723"
+        android:strokeWidth="1.5"
+        android:pathData="M56,60 A19,15 0 1 0 94,60 A19,15 0 1 0 56,60 Z" />
+
+    <!-- Dog muzzle oval -->
+    <path
+        android:fillColor="#EFEBE9"
+        android:strokeColor="#BCAAA4"
+        android:strokeWidth="0.8"
+        android:pathData="M65,67 A10,7 0 1 0 85,67 A10,7 0 1 0 65,67 Z" />
+
+    <!-- Dog cheeks (pink, translucent) -->
+    <path
+        android:fillColor="#FFCCBC"
+        android:fillAlpha="0.75"
+        android:pathData="M57,63 A5,3 0 1 0 67,63 A5,3 0 1 0 57,63 Z" />
+    <path
+        android:fillColor="#FFCCBC"
+        android:fillAlpha="0.75"
+        android:pathData="M83,63 A5,3 0 1 0 93,63 A5,3 0 1 0 83,63 Z" />
+
+    <!-- Dog eyes (round, dark) -->
+    <path
+        android:fillColor="#3E2723"
+        android:pathData="M67.5,57.6 A2.5,2.5 0 1 0 72.5,57.6 A2.5,2.5 0 1 0 67.5,57.6 Z" />
+    <path
+        android:fillColor="#3E2723"
+        android:pathData="M77.5,57.6 A2.5,2.5 0 1 0 82.5,57.6 A2.5,2.5 0 1 0 77.5,57.6 Z" />
+
+    <!-- Dog eye highlights -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M70.1,56.3 A0.9,0.9 0 1 0 71.9,56.3 A0.9,0.9 0 1 0 70.1,56.3 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M80.1,56.3 A0.9,0.9 0 1 0 81.9,56.3 A0.9,0.9 0 1 0 80.1,56.3 Z" />
+
+    <!-- Dog nose (large dark oval) -->
+    <path
+        android:fillColor="#4E342E"
+        android:pathData="M70.5,65 A4.5,3.5 0 1 0 79.5,65 A4.5,3.5 0 1 0 70.5,65 Z" />
+
+    <!-- Dog nose highlight -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.5"
+        android:pathData="M72,63.8 A1.5,1 0 1 0 75,63.8 A1.5,1 0 1 0 72,63.8 Z" />
+
+    <!-- Dog smile -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#3E2723"
+        android:strokeWidth="1.2"
+        android:pathData="M69,70 Q75,74 81,70" />
+
+    <!-- Dog tongue (pink, peeking below smile) -->
+    <path
+        android:fillColor="#F48FB1"
+        android:pathData="M73,73 A2,2.5 0 1 0 77,73 A2,2.5 0 1 0 73,73 Z" />
+
+    <!-- ===== CENTER: white 4-pointed star ===== -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,30 L55.8,34.8 L61,36 L55.8,37.2 L54,42 L52.2,37.2 L47,36 L52.2,34.8 Z" />
+
 </vector>
