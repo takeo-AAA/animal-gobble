@@ -47,19 +47,9 @@ import kotlinx.coroutines.withContext
 enum class AppScreen { TITLE, HOW_TO_PLAY, GAME }
 enum class PieceSize(val order: Int) { SMALL(1), MEDIUM(2), LARGE(3) }
 
-enum class Player(
-    val label: String,
-    val color: Color,
-    val emoji: Map<PieceSize, String>
-) {
-    ONE(
-        "🐱 ネコチーム", Color(0xFFFF8F00),
-        mapOf(PieceSize.SMALL to "🐱", PieceSize.MEDIUM to "🐈", PieceSize.LARGE to "🦁")
-    ),
-    TWO(
-        "🐶 イヌチーム", Color(0xFF1565C0),
-        mapOf(PieceSize.SMALL to "🐶", PieceSize.MEDIUM to "🐕", PieceSize.LARGE to "🐺")
-    )
+enum class Player(val label: String, val color: Color) {
+    ONE("🐱 ネコチーム", Color(0xFFFF8F00)),
+    TWO("🐶 イヌチーム", Color(0xFF1565C0))
 }
 
 data class Piece(val player: Player, val size: PieceSize)
@@ -82,142 +72,231 @@ data class Move(
 )
 
 // ---------------------------------------------------------------------------
-// Original character illustrations
+// Characters — kawaii flat style (title screen / player area / win dialog)
 // ---------------------------------------------------------------------------
 
 @Composable
 fun CatCharacter(sizeDp: Dp, modifier: Modifier = Modifier) {
     Canvas(modifier = modifier.size(sizeDp)) {
-        val s = size.minDimension
+        val s  = size.minDimension
         val cx = size.width / 2f
-        val cy = size.height / 2f + s * 0.05f
-        val r = s * 0.40f
+        val cy = size.height / 2f + s * 0.08f
+        val r  = s * 0.37f
+        val dk = Color(0xFF3E2723)   // dark brown outline
+        val ow = r * 0.13f
 
-        // --- ears (behind face) ---
-        fun earPath(sign: Float) = Path().apply {
-            moveTo(cx + sign * r * 0.72f, cy - r * 0.55f)
-            lineTo(cx + sign * r * 0.36f, cy - r * 1.38f)
-            lineTo(cx + sign * r * 0.04f, cy - r * 0.78f)
-            close()
+        // ears — outlined triangles
+        fun earOuter(sg: Float) = Path().apply {
+            moveTo(cx + sg*r*0.62f, cy - r*0.74f)
+            lineTo(cx + sg*r*0.36f, cy - r*1.40f)
+            lineTo(cx + sg*r*0.02f, cy - r*0.87f); close()
         }
-        fun innerEarPath(sign: Float) = Path().apply {
-            moveTo(cx + sign * r * 0.60f, cy - r * 0.60f)
-            lineTo(cx + sign * r * 0.36f, cy - r * 1.10f)
-            lineTo(cx + sign * r * 0.10f, cy - r * 0.76f)
-            close()
+        fun earFill(sg: Float) = Path().apply {
+            moveTo(cx + sg*r*0.57f, cy - r*0.80f)
+            lineTo(cx + sg*r*0.36f, cy - r*1.22f)
+            lineTo(cx + sg*r*0.06f, cy - r*0.91f); close()
         }
-        drawPath(earPath(-1f), Color(0xFFE65100))
-        drawPath(earPath(1f),  Color(0xFFE65100))
-        drawPath(innerEarPath(-1f), Color(0xFFF8BBD0))
-        drawPath(innerEarPath(1f),  Color(0xFFF8BBD0))
+        fun earInner(sg: Float) = Path().apply {
+            moveTo(cx + sg*r*0.51f, cy - r*0.87f)
+            lineTo(cx + sg*r*0.36f, cy - r*1.06f)
+            lineTo(cx + sg*r*0.10f, cy - r*0.93f); close()
+        }
+        listOf(-1f, 1f).forEach { sg ->
+            drawPath(earOuter(sg), dk)
+            drawPath(earFill(sg),  Color(0xFFFB8C00))
+            drawPath(earInner(sg), Color(0xFFF8BBD0))
+        }
 
-        // --- face ---
-        drawCircle(Color(0xFFFFB300), r, Offset(cx, cy))
-
-        // tabby forehead stripes
-        val sw = r * 0.052f
-        for (dx in listOf(-0.16f, 0f, 0.16f)) {
-            drawLine(Color(0xFFFF8F00),
-                Offset(cx + r * dx, cy - r * 0.72f),
-                Offset(cx + r * dx * 0.85f, cy - r * 0.46f),
-                sw, StrokeCap.Round)
-        }
+        // face
+        drawCircle(dk, r + ow, Offset(cx, cy))
+        drawCircle(Color(0xFFFFF8E1), r, Offset(cx, cy))
 
         // cheeks
-        drawCircle(Color(0x55F48FB1), r * 0.23f, Offset(cx - r * 0.52f, cy + r * 0.24f))
-        drawCircle(Color(0x55F48FB1), r * 0.23f, Offset(cx + r * 0.52f, cy + r * 0.24f))
+        drawCircle(Color(0x88F8BBD0), r*0.22f, Offset(cx - r*0.54f, cy + r*0.26f))
+        drawCircle(Color(0x88F8BBD0), r*0.22f, Offset(cx + r*0.54f, cy + r*0.26f))
 
-        // eyes — white
-        drawOval(Color.White,  topLeft = Offset(cx - r * 0.50f, cy - r * 0.30f), size = Size(r * 0.32f, r * 0.38f))
-        drawOval(Color.White,  topLeft = Offset(cx + r * 0.18f, cy - r * 0.30f), size = Size(r * 0.32f, r * 0.38f))
-        // pupils
-        drawOval(Color(0xFF1A1A1A), topLeft = Offset(cx - r * 0.42f, cy - r * 0.25f), size = Size(r * 0.17f, r * 0.30f))
-        drawOval(Color(0xFF1A1A1A), topLeft = Offset(cx + r * 0.25f, cy - r * 0.25f), size = Size(r * 0.17f, r * 0.30f))
-        // shine
-        drawCircle(Color.White, r * 0.057f, Offset(cx - r * 0.36f, cy - r * 0.17f))
-        drawCircle(Color.White, r * 0.057f, Offset(cx + r * 0.31f, cy - r * 0.17f))
+        // eyes
+        drawCircle(dk, r*0.25f, Offset(cx - r*0.30f, cy - r*0.14f))
+        drawCircle(dk, r*0.25f, Offset(cx + r*0.30f, cy - r*0.14f))
+        drawCircle(Color.White, r*0.10f, Offset(cx - r*0.20f, cy - r*0.24f))
+        drawCircle(Color.White, r*0.10f, Offset(cx + r*0.40f, cy - r*0.24f))
+        drawCircle(Color.White, r*0.055f, Offset(cx - r*0.40f, cy - r*0.08f))
+        drawCircle(Color.White, r*0.055f, Offset(cx + r*0.20f, cy - r*0.08f))
 
-        // nose
+        // nose — pink triangle
         drawPath(Path().apply {
-            moveTo(cx, cy + r * 0.14f)
-            lineTo(cx - r * 0.10f, cy + r * 0.03f)
-            lineTo(cx + r * 0.10f, cy + r * 0.03f)
-            close()
-        }, Color(0xFFEC407A))
+            moveTo(cx, cy + r*0.10f)
+            lineTo(cx - r*0.12f, cy - r*0.04f)
+            lineTo(cx + r*0.12f, cy - r*0.04f); close()
+        }, Color(0xFFFF80AB))
 
-        // mouth (W shape)
+        // mouth — W
         drawPath(Path().apply {
-            moveTo(cx - r * 0.36f, cy + r * 0.26f)
-            quadraticBezierTo(cx - r * 0.18f, cy + r * 0.40f, cx, cy + r * 0.30f)
-            quadraticBezierTo(cx + r * 0.18f, cy + r * 0.40f, cx + r * 0.36f, cy + r * 0.26f)
-        }, Color(0xFFBF360C), style = Stroke(r * 0.065f, cap = StrokeCap.Round))
+            moveTo(cx - r*0.38f, cy + r*0.22f)
+            quadraticBezierTo(cx - r*0.18f, cy + r*0.42f, cx, cy + r*0.30f)
+            quadraticBezierTo(cx + r*0.18f, cy + r*0.42f, cx + r*0.38f, cy + r*0.22f)
+        }, dk, style = Stroke(r*0.07f, cap = StrokeCap.Round))
 
         // whiskers
-        val wc = Color(0xC0BF360C); val ww = r * 0.038f
-        drawLine(wc, Offset(cx - r * 0.18f, cy + r * 0.06f), Offset(cx - r * 0.84f, cy - r * 0.04f), ww, StrokeCap.Round)
-        drawLine(wc, Offset(cx - r * 0.16f, cy + r * 0.13f), Offset(cx - r * 0.87f, cy + r * 0.13f), ww, StrokeCap.Round)
-        drawLine(wc, Offset(cx - r * 0.16f, cy + r * 0.20f), Offset(cx - r * 0.82f, cy + r * 0.30f), ww, StrokeCap.Round)
-        drawLine(wc, Offset(cx + r * 0.18f, cy + r * 0.06f), Offset(cx + r * 0.84f, cy - r * 0.04f), ww, StrokeCap.Round)
-        drawLine(wc, Offset(cx + r * 0.16f, cy + r * 0.13f), Offset(cx + r * 0.87f, cy + r * 0.13f), ww, StrokeCap.Round)
-        drawLine(wc, Offset(cx + r * 0.16f, cy + r * 0.20f), Offset(cx + r * 0.82f, cy + r * 0.30f), ww, StrokeCap.Round)
+        val wc = Color(0x90616161); val ws = r*0.04f
+        listOf(-1, 0, 1).forEach { i ->
+            val yo = i * r * 0.13f
+            drawLine(wc, Offset(cx - r*0.14f, cy + r*0.04f + yo), Offset(cx - r*0.86f, cy - r*0.06f + yo), ws, StrokeCap.Round)
+            drawLine(wc, Offset(cx + r*0.14f, cy + r*0.04f + yo), Offset(cx + r*0.86f, cy - r*0.06f + yo), ws, StrokeCap.Round)
+        }
     }
 }
 
 @Composable
 fun DogCharacter(sizeDp: Dp, modifier: Modifier = Modifier) {
     Canvas(modifier = modifier.size(sizeDp)) {
-        val s = size.minDimension
+        val s  = size.minDimension
         val cx = size.width / 2f
-        val cy = size.height / 2f - s * 0.02f
-        val r = s * 0.37f
+        val cy = size.height / 2f + s * 0.04f
+        val r  = s * 0.36f
+        val nv = Color(0xFF1A237E)   // dark navy outline
+        val ow = r * 0.13f
+        val eb = Color(0xFF8D6E63)   // ear brown
 
-        // --- floppy ears (behind face) ---
-        drawOval(Color(0xFF0D47A1), topLeft = Offset(cx - r * 1.40f, cy - r * 0.22f), size = Size(r * 0.74f, r * 1.12f))
-        drawOval(Color(0xFF0D47A1), topLeft = Offset(cx + r * 0.66f, cy - r * 0.22f), size = Size(r * 0.74f, r * 1.12f))
-        // ear highlight
-        drawOval(Color(0xFF1565C0), topLeft = Offset(cx - r * 1.30f, cy - r * 0.10f), size = Size(r * 0.54f, r * 0.86f))
-        drawOval(Color(0xFF1565C0), topLeft = Offset(cx + r * 0.76f, cy - r * 0.10f), size = Size(r * 0.54f, r * 0.86f))
+        // floppy ears
+        drawOval(nv, topLeft = Offset(cx - r*1.28f, cy - r*0.30f), size = Size(r*0.70f, r*1.12f))
+        drawOval(eb, topLeft = Offset(cx - r*1.22f, cy - r*0.24f), size = Size(r*0.58f, r*0.96f))
+        drawOval(Color(0xFFA1887F), topLeft = Offset(cx - r*1.14f, cy - r*0.10f), size = Size(r*0.38f, r*0.68f))
+        drawOval(nv, topLeft = Offset(cx + r*0.58f, cy - r*0.30f), size = Size(r*0.70f, r*1.12f))
+        drawOval(eb, topLeft = Offset(cx + r*0.64f, cy - r*0.24f), size = Size(r*0.58f, r*0.96f))
+        drawOval(Color(0xFFA1887F), topLeft = Offset(cx + r*0.76f, cy - r*0.10f), size = Size(r*0.38f, r*0.68f))
 
-        // --- face ---
-        drawCircle(Color(0xFFFFF9E6), r, Offset(cx, cy))
-        drawCircle(Color(0xFF1565C0), r, Offset(cx, cy), style = Stroke(r * 0.10f))
+        // face
+        drawCircle(nv, r + ow, Offset(cx, cy))
+        drawCircle(Color(0xFFFFF8E1), r, Offset(cx, cy))
 
-        // muzzle spot
-        drawOval(Color(0xFFFFECB3), topLeft = Offset(cx - r * 0.30f, cy + r * 0.10f), size = Size(r * 0.60f, r * 0.45f))
+        // muzzle
+        drawOval(Color(0xFFFFECB3), topLeft = Offset(cx - r*0.34f, cy + r*0.08f), size = Size(r*0.68f, r*0.52f))
 
         // cheeks
-        drawCircle(Color(0x60F48FB1), r * 0.20f, Offset(cx - r * 0.54f, cy + r * 0.30f))
-        drawCircle(Color(0x60F48FB1), r * 0.20f, Offset(cx + r * 0.54f, cy + r * 0.30f))
+        drawCircle(Color(0x88F8BBD0), r*0.21f, Offset(cx - r*0.58f, cy + r*0.28f))
+        drawCircle(Color(0x88F8BBD0), r*0.21f, Offset(cx + r*0.58f, cy + r*0.28f))
 
-        // eyes — white
-        drawCircle(Color.White, r * 0.21f, Offset(cx - r * 0.30f, cy - r * 0.18f))
-        drawCircle(Color.White, r * 0.21f, Offset(cx + r * 0.30f, cy - r * 0.18f))
-        // pupils
-        drawCircle(Color(0xFF1A1A1A), r * 0.13f, Offset(cx - r * 0.30f, cy - r * 0.18f))
-        drawCircle(Color(0xFF1A1A1A), r * 0.13f, Offset(cx + r * 0.30f, cy - r * 0.18f))
-        // shine
-        drawCircle(Color.White, r * 0.055f, Offset(cx - r * 0.22f, cy - r * 0.24f))
-        drawCircle(Color.White, r * 0.055f, Offset(cx + r * 0.38f, cy - r * 0.24f))
+        // eyes
+        drawCircle(Color(0xFF212121), r*0.25f, Offset(cx - r*0.30f, cy - r*0.18f))
+        drawCircle(Color(0xFF212121), r*0.25f, Offset(cx + r*0.30f, cy - r*0.18f))
+        drawCircle(Color.White, r*0.10f, Offset(cx - r*0.20f, cy - r*0.26f))
+        drawCircle(Color.White, r*0.10f, Offset(cx + r*0.40f, cy - r*0.26f))
+        drawCircle(Color.White, r*0.055f, Offset(cx - r*0.40f, cy - r*0.12f))
+        drawCircle(Color.White, r*0.055f, Offset(cx + r*0.20f, cy - r*0.12f))
 
         // nose
-        drawOval(Color(0xFF4E342E), topLeft = Offset(cx - r * 0.20f, cy + r * 0.04f), size = Size(r * 0.40f, r * 0.27f))
-        drawCircle(Color(0x50FFFFFF), r * 0.065f, Offset(cx - r * 0.08f, cy + r * 0.10f))
+        drawOval(Color(0xFF4E342E), topLeft = Offset(cx - r*0.20f, cy + r*0.10f), size = Size(r*0.40f, r*0.28f))
+        drawCircle(Color(0x60FFFFFF), r*0.07f, Offset(cx - r*0.08f, cy + r*0.16f))
 
-        // mouth
-        val ms = Stroke(r * 0.065f, cap = StrokeCap.Round)
-        drawLine(Color(0xFF4E342E), Offset(cx, cy + r * 0.31f), Offset(cx, cy + r * 0.44f), r * 0.065f, StrokeCap.Round)
+        // mouth + tongue
+        val sw = r * 0.07f
+        drawLine(Color(0xFF4E342E), Offset(cx, cy + r*0.38f), Offset(cx, cy + r*0.50f), sw, StrokeCap.Round)
         drawPath(Path().apply {
-            moveTo(cx, cy + r * 0.44f)
-            quadraticBezierTo(cx - r * 0.22f, cy + r * 0.60f, cx - r * 0.40f, cy + r * 0.52f)
-        }, Color(0xFF4E342E), style = ms)
+            moveTo(cx, cy + r*0.50f)
+            quadraticBezierTo(cx - r*0.22f, cy + r*0.68f, cx - r*0.40f, cy + r*0.58f)
+        }, Color(0xFF4E342E), style = Stroke(sw, cap = StrokeCap.Round))
         drawPath(Path().apply {
-            moveTo(cx, cy + r * 0.44f)
-            quadraticBezierTo(cx + r * 0.22f, cy + r * 0.60f, cx + r * 0.40f, cy + r * 0.52f)
-        }, Color(0xFF4E342E), style = ms)
+            moveTo(cx, cy + r*0.50f)
+            quadraticBezierTo(cx + r*0.22f, cy + r*0.68f, cx + r*0.40f, cy + r*0.58f)
+        }, Color(0xFF4E342E), style = Stroke(sw, cap = StrokeCap.Round))
+        drawOval(Color(0xFFF48FB1), topLeft = Offset(cx - r*0.15f, cy + r*0.46f), size = Size(r*0.30f, r*0.24f))
+        drawLine(Color(0xFFE91E63), Offset(cx, cy + r*0.46f), Offset(cx, cy + r*0.68f), r*0.04f, StrokeCap.Round)
+    }
+}
 
-        // tongue
-        drawOval(Color(0xFFF48FB1), topLeft = Offset(cx - r * 0.15f, cy + r * 0.40f), size = Size(r * 0.30f, r * 0.24f))
-        drawLine(Color(0xFFE91E8C), Offset(cx, cy + r * 0.40f), Offset(cx, cy + r * 0.62f), r * 0.04f, StrokeCap.Round)
+// ---------------------------------------------------------------------------
+// Piece icons — simplified bold versions for board cells and hand buttons
+// ---------------------------------------------------------------------------
+
+@Composable
+fun CatPiece(sizeDp: Dp, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(sizeDp)) {
+        val s  = size.minDimension
+        val cx = size.width / 2f
+        val cy = size.height / 2f + s * 0.07f
+        val r  = s * 0.36f
+        val dk = Color(0xFF3E2723)
+        val ow = r * 0.14f
+
+        fun earOuter(sg: Float) = Path().apply {
+            moveTo(cx + sg*r*0.60f, cy - r*0.74f)
+            lineTo(cx + sg*r*0.36f, cy - r*1.30f)
+            lineTo(cx + sg*r*0.03f, cy - r*0.87f); close()
+        }
+        fun earFill(sg: Float) = Path().apply {
+            moveTo(cx + sg*r*0.55f, cy - r*0.80f)
+            lineTo(cx + sg*r*0.36f, cy - r*1.12f)
+            lineTo(cx + sg*r*0.07f, cy - r*0.91f); close()
+        }
+        listOf(-1f, 1f).forEach { sg ->
+            drawPath(earOuter(sg), dk)
+            drawPath(earFill(sg),  Color(0xFFFB8C00))
+        }
+
+        drawCircle(dk, r + ow, Offset(cx, cy))
+        drawCircle(Color(0xFFFFF8E1), r, Offset(cx, cy))
+
+        drawCircle(Color(0x88F8BBD0), r*0.20f, Offset(cx - r*0.52f, cy + r*0.26f))
+        drawCircle(Color(0x88F8BBD0), r*0.20f, Offset(cx + r*0.52f, cy + r*0.26f))
+
+        drawCircle(dk, r*0.23f, Offset(cx - r*0.30f, cy - r*0.14f))
+        drawCircle(dk, r*0.23f, Offset(cx + r*0.30f, cy - r*0.14f))
+        drawCircle(Color.White, r*0.09f, Offset(cx - r*0.20f, cy - r*0.22f))
+        drawCircle(Color.White, r*0.09f, Offset(cx + r*0.40f, cy - r*0.22f))
+
+        drawCircle(Color(0xFFFF80AB), r*0.085f, Offset(cx, cy + r*0.10f))
+
+        drawPath(Path().apply {
+            moveTo(cx - r*0.36f, cy + r*0.22f)
+            quadraticBezierTo(cx - r*0.16f, cy + r*0.38f, cx, cy + r*0.28f)
+            quadraticBezierTo(cx + r*0.16f, cy + r*0.38f, cx + r*0.36f, cy + r*0.22f)
+        }, dk, style = Stroke(r*0.09f, cap = StrokeCap.Round))
+    }
+}
+
+@Composable
+fun DogPiece(sizeDp: Dp, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(sizeDp)) {
+        val s  = size.minDimension
+        val cx = size.width / 2f
+        val cy = size.height / 2f + s * 0.04f
+        val r  = s * 0.34f
+        val nv = Color(0xFF1A237E)
+        val ow = r * 0.14f
+        val eb = Color(0xFF8D6E63)
+
+        drawOval(nv, topLeft = Offset(cx - r*1.22f, cy - r*0.28f), size = Size(r*0.64f, r*0.96f))
+        drawOval(eb, topLeft = Offset(cx - r*1.16f, cy - r*0.22f), size = Size(r*0.52f, r*0.82f))
+        drawOval(nv, topLeft = Offset(cx + r*0.58f, cy - r*0.28f), size = Size(r*0.64f, r*0.96f))
+        drawOval(eb, topLeft = Offset(cx + r*0.64f, cy - r*0.22f), size = Size(r*0.52f, r*0.82f))
+
+        drawCircle(nv, r + ow, Offset(cx, cy))
+        drawCircle(Color(0xFFFFF8E1), r, Offset(cx, cy))
+
+        drawOval(Color(0xFFFFECB3), topLeft = Offset(cx - r*0.30f, cy + r*0.08f), size = Size(r*0.60f, r*0.48f))
+
+        drawCircle(Color(0x88F8BBD0), r*0.18f, Offset(cx - r*0.54f, cy + r*0.28f))
+        drawCircle(Color(0x88F8BBD0), r*0.18f, Offset(cx + r*0.54f, cy + r*0.28f))
+
+        drawCircle(Color(0xFF212121), r*0.22f, Offset(cx - r*0.28f, cy - r*0.16f))
+        drawCircle(Color(0xFF212121), r*0.22f, Offset(cx + r*0.28f, cy - r*0.16f))
+        drawCircle(Color.White, r*0.085f, Offset(cx - r*0.18f, cy - r*0.24f))
+        drawCircle(Color.White, r*0.085f, Offset(cx + r*0.38f, cy - r*0.24f))
+
+        drawOval(Color(0xFF4E342E), topLeft = Offset(cx - r*0.16f, cy + r*0.10f), size = Size(r*0.32f, r*0.24f))
+
+        val sw = r * 0.08f
+        drawLine(Color(0xFF4E342E), Offset(cx, cy + r*0.34f), Offset(cx, cy + r*0.44f), sw, StrokeCap.Round)
+        drawPath(Path().apply {
+            moveTo(cx, cy + r*0.44f)
+            quadraticBezierTo(cx - r*0.18f, cy + r*0.58f, cx - r*0.32f, cy + r*0.50f)
+        }, Color(0xFF4E342E), style = Stroke(sw, cap = StrokeCap.Round))
+        drawPath(Path().apply {
+            moveTo(cx, cy + r*0.44f)
+            quadraticBezierTo(cx + r*0.18f, cy + r*0.58f, cx + r*0.32f, cy + r*0.50f)
+        }, Color(0xFF4E342E), style = Stroke(sw, cap = StrokeCap.Round))
+        drawOval(Color(0xFFF48FB1), topLeft = Offset(cx - r*0.11f, cy + r*0.40f), size = Size(r*0.22f, r*0.18f))
     }
 }
 
@@ -240,10 +319,10 @@ fun checkWinner(board: List<List<List<Piece>>>): Player? {
 }
 
 fun placePiece(state: GameState, toRow: Int, toCol: Int): GameState {
-    val fromBoard = state.selectedBoardPos
+    val fromBoard    = state.selectedBoardPos
     val fromHandSize = state.selectedHandPiece
     val pieceToPlace: Piece = when {
-        fromBoard != null -> state.board[fromBoard.first][fromBoard.second].lastOrNull() ?: return state
+        fromBoard    != null -> state.board[fromBoard.first][fromBoard.second].lastOrNull() ?: return state
         fromHandSize != null -> {
             if ((state.hand[state.currentPlayer]?.get(fromHandSize) ?: 0) <= 0) return state
             Piece(state.currentPlayer, fromHandSize)
@@ -267,8 +346,8 @@ fun placePiece(state: GameState, toRow: Int, toCol: Int): GameState {
         row.mapIndexed { c, stack ->
             when {
                 r == fromBoard?.first && c == fromBoard.second -> stack.dropLast(1)
-                r == toRow && c == toCol -> stack + pieceToPlace
-                else -> stack
+                r == toRow && c == toCol                       -> stack + pieceToPlace
+                else                                           -> stack
             }
         }
     }
@@ -280,7 +359,7 @@ fun placePiece(state: GameState, toRow: Int, toCol: Int): GameState {
         }
     } else state.hand
     val winner = checkWinner(newBoard)
-    val next = if (state.currentPlayer == Player.ONE) Player.TWO else Player.ONE
+    val next   = if (state.currentPlayer == Player.ONE) Player.TWO else Player.ONE
     return state.copy(
         board = newBoard, hand = newHand,
         currentPlayer = if (winner != null) state.currentPlayer else next,
@@ -366,16 +445,16 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun AppHost() {
-    var screen by remember { mutableStateOf(AppScreen.TITLE) }
+    var screen    by remember { mutableStateOf(AppScreen.TITLE) }
     var isCpuMode by remember { mutableStateOf(false) }
     when (screen) {
-        AppScreen.TITLE -> TitleScreen(
-            onStart2P = { isCpuMode = false; screen = AppScreen.GAME },
-            onStartCpu = { isCpuMode = true; screen = AppScreen.GAME },
+        AppScreen.TITLE      -> TitleScreen(
+            onStart2P  = { isCpuMode = false; screen = AppScreen.GAME },
+            onStartCpu = { isCpuMode = true;  screen = AppScreen.GAME },
             onHowToPlay = { screen = AppScreen.HOW_TO_PLAY }
         )
         AppScreen.HOW_TO_PLAY -> HowToPlayScreen(onBack = { screen = AppScreen.TITLE })
-        AppScreen.GAME -> GameScreen(isCpuMode = isCpuMode, onBackToTitle = { screen = AppScreen.TITLE })
+        AppScreen.GAME        -> GameScreen(isCpuMode = isCpuMode, onBackToTitle = { screen = AppScreen.TITLE })
     }
 }
 
@@ -390,93 +469,57 @@ fun TitleScreen(onStart2P: () -> Unit, onStartCpu: () -> Unit, onHowToPlay: () -
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceEvenly
     ) {
-        // Title
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                "ねこVSいぬ！",
-                fontSize = 40.sp, fontWeight = FontWeight.ExtraBold,
-                color = Color(0xFF4E342E), textAlign = TextAlign.Center
-            )
-            Text(
-                "コマかくしバトル",
-                fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Color(0xFF8D6E63)
-            )
+            Text("ねこVSいぬ！", fontSize = 40.sp, fontWeight = FontWeight.ExtraBold,
+                color = Color(0xFF4E342E), textAlign = TextAlign.Center)
+            Text("コマかくしバトル", fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Color(0xFF8D6E63))
             Spacer(Modifier.height(4.dp))
             Surface(shape = RoundedCornerShape(20.dp), color = Color(0xFFEFEBE9)) {
-                Text("Animal Gobble",
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp),
+                Text("Animal Gobble", modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp),
                     fontSize = 11.sp, color = Color(0xFF8D6E63))
             }
         }
 
-        // Characters
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 CatCharacter(sizeDp = 108.dp)
                 Spacer(Modifier.height(6.dp))
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFFFF8F00)
-                ) {
-                    Text("🐱 ネコチーム",
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                Surface(shape = RoundedCornerShape(12.dp), color = Color(0xFFFF8F00)) {
+                    Text("🐱 ネコチーム", modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                         color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 }
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("✨VS✨", fontSize = 18.sp, fontWeight = FontWeight.Black, color = Color(0xFF8D6E63))
                 Spacer(Modifier.height(6.dp))
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = Color(0xFFF5F0E8)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(6.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
+                Surface(shape = RoundedCornerShape(8.dp), color = Color(0xFFF5F0E8)) {
+                    Column(modifier = Modifier.padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("おおきいこまで", fontSize = 10.sp, color = Color(0xFF8D6E63))
-                        Text("かくせ！", fontSize = 10.sp, color = Color(0xFF8D6E63))
+                        Text("かくせ！",   fontSize = 10.sp, color = Color(0xFF8D6E63))
                     }
                 }
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 DogCharacter(sizeDp = 108.dp)
                 Spacer(Modifier.height(6.dp))
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFF1565C0)
-                ) {
-                    Text("🐶 イヌチーム",
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                Surface(shape = RoundedCornerShape(12.dp), color = Color(0xFF1565C0)) {
+                    Text("🐶 イヌチーム", modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                         color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 }
             }
         }
 
-        // Buttons
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Button(
-                onClick = onStart2P,
-                modifier = Modifier.fillMaxWidth().height(54.dp),
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Button(onClick = onStart2P, modifier = Modifier.fillMaxWidth().height(54.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF8F00))
             ) { Text("👥 2人でやる！", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold) }
-            Button(
-                onClick = onStartCpu,
-                modifier = Modifier.fillMaxWidth().height(54.dp),
+            Button(onClick = onStartCpu, modifier = Modifier.fillMaxWidth().height(54.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1565C0))
             ) { Text("🤖 CPUとたたかう！", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold) }
-            OutlinedButton(
-                onClick = onHowToPlay,
-                modifier = Modifier.fillMaxWidth().height(46.dp),
+            OutlinedButton(onClick = onHowToPlay, modifier = Modifier.fillMaxWidth().height(46.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF4E342E)),
                 border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.5.dp)
@@ -495,24 +538,20 @@ fun TitleScreen(onStart2P: () -> Unit, onStartCpu: () -> Unit, onHowToPlay: () -
 fun HowToPlayScreen(onBack: () -> Unit) {
     val scrollState = rememberScrollState()
     Column(modifier = Modifier.fillMaxSize().systemBarsPadding()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ほどく", tint = Color(0xFF4E342E))
             }
             Text("あそびかた", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4E342E))
         }
         HorizontalDivider(color = Color(0xFFD7CCC8))
-        Column(
-            modifier = Modifier.verticalScroll(scrollState).padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
-        ) {
+        Column(modifier = Modifier.verticalScroll(scrollState).padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)) {
             RuleSection("🎯", "どうやって かつの？",
                 "ネコチーム ― イヌチームの２人対戦ゲームだよ！\n3×3のマスにこまをならべて、たて・よこ・ななめに3つならべたら 🏆 かち！")
             RuleSection("🐱", "こまのせつめい",
-                "それぞれのチームに小・中・大のこまが2まいずつあるよ。\n\n🐱 小：ちびネコ\n🐈 中：フツウネコ\n🦁 大：ライオン")
+                "それぞれのチームに小・中・大のこまが2まいずつあるよ。\n\n小：ちびこま\n中：ふつうこま\n大：おおきいこま")
             RuleSection("💪", "おおきいこまはつよい！",
                 "おおきいこまはちいさいこまにかぶせてかくせるよ！\n大 > 中 > 小 のじゅん。おなじおおきさや小さいこまはかぶせられないよ。")
             RuleSection("🔄", "じぶんのばんでできること",
@@ -547,7 +586,7 @@ fun RuleSection(emoji: String, title: String, body: String, highlight: Boolean =
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(title, fontSize = 15.sp, fontWeight = FontWeight.Bold,
                     color = if (highlight) Color(0xFFE65100) else Color(0xFF4E342E))
-                Text(body, fontSize = 13.sp, color = Color(0xFF5D4037), lineHeight = 20.sp)
+                Text(body,  fontSize = 13.sp, color = Color(0xFF5D4037), lineHeight = 20.sp)
             }
         }
     }
@@ -560,9 +599,10 @@ fun RuleSection(emoji: String, title: String, body: String, highlight: Boolean =
 @Composable
 fun GameScreen(onBackToTitle: () -> Unit = {}, isCpuMode: Boolean = false) {
     val cpuPlayer = if (isCpuMode) Player.TWO else null
-    var gameState by remember { mutableStateOf(GameState()) }
-    var cpuThinking by remember { mutableStateOf(false) }
+    var gameState       by remember { mutableStateOf(GameState()) }
+    var cpuThinking     by remember { mutableStateOf(false) }
     var showQuitConfirm by remember { mutableStateOf(false) }
+
     LaunchedEffect(gameState.currentPlayer, gameState.winner) {
         if (cpuPlayer != null && gameState.winner == null && gameState.currentPlayer == cpuPlayer) {
             cpuThinking = true; delay(500)
@@ -571,44 +611,29 @@ fun GameScreen(onBackToTitle: () -> Unit = {}, isCpuMode: Boolean = false) {
             cpuThinking = false
         }
     }
+
     if (gameState.winner != null) {
         WinnerDialog(gameState.winner!!, isCpuMode, onReset = { gameState = GameState() }, onBackToTitle)
     }
+
     if (showQuitConfirm) {
         Dialog(onDismissRequest = { showQuitConfirm = false }) {
-            Card(
-                shape = RoundedCornerShape(20.dp),
+            Card(shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White),
-                modifier = Modifier.padding(8.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
+                modifier = Modifier.padding(8.dp)) {
+                Column(modifier = Modifier.padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
+                    verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     Text("🏠", fontSize = 36.sp)
-                    Text(
-                        "ほんとうにやめる？",
-                        fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4E342E)
-                    )
-                    Text(
-                        "タイトルにもどります。\nゲームのけっかはきえます。",
-                        fontSize = 13.sp, color = Color(0xFF8D6E63),
-                        textAlign = TextAlign.Center
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = { showQuitConfirm = false },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp)
+                    Text("ほんとうにやめる？", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4E342E))
+                    Text("タイトルにもどります。\nゲームのけっかはきえます。",
+                        fontSize = 13.sp, color = Color(0xFF8D6E63), textAlign = TextAlign.Center)
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedButton(onClick = { showQuitConfirm = false },
+                            modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)
                         ) { Text("つづける", fontSize = 15.sp) }
-                        Button(
-                            onClick = onBackToTitle,
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp),
+                        Button(onClick = onBackToTitle,
+                            modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE57373))
                         ) { Text("やめる", fontSize = 15.sp, fontWeight = FontWeight.Bold) }
                     }
@@ -616,6 +641,7 @@ fun GameScreen(onBackToTitle: () -> Unit = {}, isCpuMode: Boolean = false) {
             }
         }
     }
+
     Column(
         modifier = Modifier.fillMaxSize().systemBarsPadding().padding(8.dp),
         verticalArrangement = Arrangement.SpaceBetween,
@@ -623,16 +649,10 @@ fun GameScreen(onBackToTitle: () -> Unit = {}, isCpuMode: Boolean = false) {
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             if (gameState.winner == null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    TextButton(
-                        onClick = { showQuitConfirm = true },
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = { showQuitConfirm = true },
                         colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFF8D6E63))
-                    ) {
-                        Text("🏠 やめる", fontSize = 12.sp)
-                    }
+                    ) { Text("🏠 やめる", fontSize = 12.sp) }
                 }
             }
             Column(
@@ -644,7 +664,7 @@ fun GameScreen(onBackToTitle: () -> Unit = {}, isCpuMode: Boolean = false) {
                     if (!isCpuMode && gameState.currentPlayer == Player.TWO) {
                         gameState = gameState.copy(
                             selectedHandPiece = if (gameState.selectedHandPiece == size) null else size,
-                            selectedBoardPos = null)
+                            selectedBoardPos  = null)
                     }
                 }
             }
@@ -667,7 +687,7 @@ fun GameScreen(onBackToTitle: () -> Unit = {}, isCpuMode: Boolean = false) {
             if (gameState.currentPlayer == Player.ONE && !cpuThinking) {
                 gameState = gameState.copy(
                     selectedHandPiece = if (gameState.selectedHandPiece == size) null else size,
-                    selectedBoardPos = null)
+                    selectedBoardPos  = null)
             }
         }
     }
@@ -689,8 +709,7 @@ fun PlayerArea(
         Text(if (isCurrentPlayer) "あなたのバンだよ！" else "",
             color = player.color, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            val charSize = 36.dp
-            if (player == Player.ONE) CatCharacter(charSize) else DogCharacter(charSize)
+            if (player == Player.ONE) CatCharacter(36.dp) else DogCharacter(36.dp)
             Text(player.label, color = player.color, fontSize = 15.sp, fontWeight = FontWeight.Bold)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -707,8 +726,8 @@ fun PlayerArea(
 
 @Composable
 fun HandPieceButton(player: Player, size: PieceSize, count: Int, isSelected: Boolean, enabled: Boolean, onClick: () -> Unit) {
-    val emojiSize = when (size) { PieceSize.SMALL -> 22.sp; PieceSize.MEDIUM -> 30.sp; PieceSize.LARGE -> 38.sp }
-    val boxSize = when (size) { PieceSize.SMALL -> 52.dp; PieceSize.MEDIUM -> 62.dp; PieceSize.LARGE -> 72.dp }
+    val boxSize   = when (size) { PieceSize.SMALL -> 52.dp; PieceSize.MEDIUM -> 62.dp; PieceSize.LARGE -> 72.dp }
+    val pieceSize = when (size) { PieceSize.SMALL -> 24.dp; PieceSize.MEDIUM -> 32.dp; PieceSize.LARGE -> 42.dp }
     Box(
         modifier = Modifier.size(boxSize).clip(RoundedCornerShape(10.dp))
             .background(if (isSelected) player.color.copy(0.3f) else Color.White.copy(alpha = if (enabled) 1f else 0.4f))
@@ -718,7 +737,7 @@ fun HandPieceButton(player: Player, size: PieceSize, count: Int, isSelected: Boo
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(player.emoji[size] ?: "", fontSize = emojiSize)
+            if (player == Player.ONE) CatPiece(pieceSize) else DogPiece(pieceSize)
             Text("×$count", fontSize = 11.sp, color = if (enabled) Color.DarkGray else Color.LightGray)
         }
     }
@@ -749,9 +768,8 @@ fun BoardCell(stack: List<Piece>, isSelected: Boolean, onClick: () -> Unit) {
         contentAlignment = Alignment.Center
     ) {
         if (topPiece != null) {
-            Text(topPiece.player.emoji[topPiece.size] ?: "",
-                fontSize = when (topPiece.size) { PieceSize.SMALL -> 28.sp; PieceSize.MEDIUM -> 38.sp; PieceSize.LARGE -> 52.sp },
-                textAlign = TextAlign.Center)
+            val pieceDp = when (topPiece.size) { PieceSize.SMALL -> 34.dp; PieceSize.MEDIUM -> 50.dp; PieceSize.LARGE -> 68.dp }
+            if (topPiece.player == Player.ONE) CatPiece(pieceDp) else DogPiece(pieceDp)
         }
         if (stack.size > 1) {
             Text("${stack.size}", fontSize = 10.sp, color = Color.Gray,
@@ -798,8 +816,8 @@ fun TitleScreenPreview() {
 fun CharacterPreview() {
     MaterialTheme {
         Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            CatCharacter(120.dp)
-            DogCharacter(120.dp)
+            CatCharacter(120.dp); DogCharacter(120.dp)
+            CatPiece(80.dp);     DogPiece(80.dp)
         }
     }
 }
